@@ -745,9 +745,10 @@ select * from (values
 where not exists (select 1 from public.questions);
 
 -- =====================================================================
--- 設定管理者：先在遊戲首頁用某個暱稱註冊，再把該暱稱設為 admin。
--- 例如註冊暱稱 admin 後執行：
+-- 設定第一位主持人：先到 /#/admin 的「申請權限」建立帳號（首頁只給參加者
+-- 加入遊戲，沒有註冊入口），再手動把該暱稱開通。例如暱稱 admin：
 --   update public.profiles set is_admin = true where nickname = 'admin';
+-- 之後的主持人不必再下 SQL，由現任主持人在後台「申請審核」核准即可。
 --
 -- 舊版「單人循序作答」留下的物件（attempts 表與相關函式）已不再使用，
 -- 確認不需要保留紀錄後，可自行執行下列指令清除：
