@@ -58,6 +58,19 @@ export interface GameState {
   stats: number[] | null
 }
 
+/** 後台場次清單的一列 */
+export interface HostedGame {
+  id: string
+  pin: string
+  status: GamePhase
+  question_count: number
+  player_count: number
+  /** 這場是否計入總排行榜 */
+  show_on_leaderboard: boolean
+  created_at: string
+  ended_at: string | null
+}
+
 export type HostApplicationStatus = 'pending' | 'approved' | 'rejected'
 
 /** 主持人權限申請 */
@@ -396,6 +409,43 @@ export async function getMyActiveGame(): Promise<{ gameId: string; pin: string; 
   }
 }
 
+/** 我主持過的所有場次（後台管理用） */
+export async function listMyGames(): Promise<HostedGame[]> {
+  const { data, error } = await supabase.rpc('list_my_games')
+  if (error) throw new Error(error.message)
+  return ((Array.isArray(data) ? data : (data ?? [])) as any[]).map((r) => ({
+    id: String(r.id),
+    pin: String(r.pin ?? ''),
+    status: r.status as GamePhase,
+    question_count: Number(r.question_count ?? 0),
+    player_count: Number(r.player_count ?? 0),
+    show_on_leaderboard: r.show_on_leaderboard !== false,
+    created_at: String(r.created_at),
+    ended_at: r.ended_at ?? null,
+  }))
+}
+
+/**
+ * 刪除場次，回傳一併移除的玩家紀錄數。
+ * 子表都是 on delete cascade，所以排行榜（彙總 game_players）會自動不再計入這一場。
+ */
+export async function deleteGame(gameId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('delete_game', {
+    p_game_id: assertUuid(gameId, '刪除場次失敗'),
+  })
+  if (error) throw new Error(error.message)
+  return Number(firstRow(data)?.removed_players ?? 0)
+}
+
+/** 切換某場次要不要列入總排行榜 */
+export async function setGameLeaderboard(gameId: string, show: boolean): Promise<void> {
+  const { error } = await supabase.rpc('set_game_leaderboard', {
+    p_game_id: assertUuid(gameId, '設定失敗'),
+    p_show: show,
+  })
+  if (error) throw new Error(error.message)
+}
+
 /** 總排行榜：累計所有已結束場次的得分 */
 export async function getGlobalLeaderboard(): Promise<GlobalRankRow[]> {
   const { data, error } = await supabase.rpc('get_global_leaderboard')
@@ -466,4 +516,37 @@ export async function updateQuestion(
 export async function deleteQuestion(id: number): Promise<void> {
   const { error } = await supabase.from('questions').delete().eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+/**
+ * 批次新增。匯入整份題庫時不必一題打一次 API。
+ * 任何一題格式不對就整批不寫入，避免匯到一半留下半套資料。
+ */
+export async function addQuestions(
+  items: { text: string; options: string[]; correct_index: number }[],
+): Promise<number> {
+  const rows = items.map((it, i) => {
+    try {
+      const clean = validateQuestion(it.text, it.options, it.correct_index)
+      return { text: it.text.trim(), options: clean, correct_index: it.correct_index }
+    } catch (e: any) {
+      throw new Error(`第 ${i + 1} 題：${e?.message ?? '格式不正確'}`)
+    }
+  })
+  if (rows.length === 0) return 0
+  const { error } = await supabase.from('questions').insert(rows)
+  if (error) throw new Error(error.message)
+  return rows.length
+}
+
+/**
+ * 清空整個題庫，回傳刪掉的題數。
+ *
+ * 注意：game_answers.question_id 有 on delete cascade，所以歷史對戰的
+ * 「逐題作答紀錄」會一併消失；玩家分數存在 game_players，排行榜不受影響。
+ */
+export async function deleteAllQuestions(): Promise<number> {
+  const { data, error } = await supabase.from('questions').delete().gt('id', 0).select('id')
+  if (error) throw new Error(error.message)
+  return data?.length ?? 0
 }

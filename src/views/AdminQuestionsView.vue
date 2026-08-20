@@ -4,8 +4,10 @@ import AdminNav from '../components/AdminNav.vue'
 import {
   getQuestionsAdmin,
   addQuestion,
+  addQuestions,
   updateQuestion,
   deleteQuestion,
+  deleteAllQuestions,
   type Question,
 } from '../db/api'
 
@@ -113,29 +115,75 @@ function exportJson() {
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
+/** 取代式匯入：先清空再匯入，避免同一份檔案匯兩次就變兩份 */
+const replaceOnImport = ref(true)
+
 async function importJson(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   error.value = ''
   message.value = ''
-  busy.value = true
+
   try {
     const arr = JSON.parse(await file.text())
-    if (!Array.isArray(arr)) throw new Error('格式不正確')
-    let ok = 0
-    for (const item of arr) {
-      if (item?.text && Array.isArray(item.options)) {
-        await addQuestion(item.text, item.options, Number(item.correct_index) || 0)
-        ok++
-      }
-    }
-    message.value = `已匯入 ${ok} 題`
+    if (!Array.isArray(arr)) throw new Error('格式不正確，最外層必須是陣列')
+
+    const items = arr
+      .filter((it: any) => it?.text && Array.isArray(it.options))
+      .map((it: any) => ({
+        text: String(it.text),
+        options: it.options.map((o: any) => String(o)),
+        correct_index: Number(it.correct_index) || 0,
+      }))
+    const skipped = arr.length - items.length
+    if (items.length === 0) throw new Error('檔案裡沒有可用的題目')
+
+    const mode = replaceOnImport.value
+      ? `會先刪掉現有的 ${questions.value.length} 題再匯入`
+      : '會加在現有題目後面'
+    if (!confirm(`要匯入 ${items.length} 題嗎？${mode}。`)) return
+
+    busy.value = true
+    if (replaceOnImport.value) await deleteAllQuestions()
+    const ok = await addQuestions(items)
+
+    message.value =
+      `已匯入 ${ok} 題` +
+      (replaceOnImport.value ? '（已取代原有題庫）' : '') +
+      (skipped > 0 ? `，略過 ${skipped} 筆格式不符` : '')
     await refresh()
   } catch (err: any) {
     error.value = '匯入失敗：' + (err?.message ?? '未知錯誤')
   } finally {
     busy.value = false
     if (fileInput.value) fileInput.value.value = ''
+  }
+}
+
+async function clearAll() {
+  const n = questions.value.length
+  if (n === 0) return
+  if (
+    !confirm(
+      `確定要清空題庫嗎？將刪除全部 ${n} 題，無法復原。\n` +
+        '· 歷史對戰的逐題作答紀錄會一併消失（玩家分數與排行榜不受影響）\n' +
+        '· 進行中的遊戲會抓不到題目，請先結束再清空',
+    )
+  ) {
+    return
+  }
+  error.value = ''
+  message.value = ''
+  busy.value = true
+  try {
+    const removed = await deleteAllQuestions()
+    resetForm()
+    message.value = `已清空題庫，刪除 ${removed} 題`
+    await refresh()
+  } catch (e: any) {
+    error.value = e?.message ?? '清空失敗'
+  } finally {
+    busy.value = false
   }
 }
 </script>
@@ -215,18 +263,39 @@ async function importJson(e: Event) {
       </div>
     </div>
 
-    <!-- 匯出 / 匯入 -->
-    <div class="flex flex-wrap items-center gap-3">
-      <button class="btn btn-ghost btn-sm" @click="exportJson">匯出題庫 JSON</button>
-      <label class="btn btn-ghost btn-sm cursor-pointer">
-        匯入題庫 JSON
+    <!-- 匯出 / 匯入 / 清空 -->
+    <div class="space-y-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <button class="btn btn-ghost btn-sm" :disabled="busy" @click="exportJson">
+          匯出題庫 JSON
+        </button>
+        <label class="btn btn-ghost btn-sm cursor-pointer">
+          匯入題庫 JSON
+          <input
+            ref="fileInput"
+            type="file"
+            accept="application/json"
+            class="hidden"
+            :disabled="busy"
+            @change="importJson"
+          />
+        </label>
+        <button
+          class="btn btn-danger btn-sm"
+          :disabled="busy || questions.length === 0"
+          @click="clearAll"
+        >
+          清空題庫
+        </button>
+      </div>
+
+      <label class="flex items-center gap-2 text-sm font-light text-ink-600">
         <input
-          ref="fileInput"
-          type="file"
-          accept="application/json"
-          class="hidden"
-          @change="importJson"
+          v-model="replaceOnImport"
+          type="checkbox"
+          class="h-4 w-4 accent-blossom-500"
         />
+        匯入前先清空題庫（取消勾選則加在現有題目後面，同一份檔案匯兩次會重複）
       </label>
     </div>
 
