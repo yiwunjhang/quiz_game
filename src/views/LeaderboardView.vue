@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import TopThreeChart from '../components/TopThreeChart.vue'
 import { getGlobalLeaderboard, type GlobalRankRow } from '../db/api'
 import { useSessionStore } from '../stores/session'
 
@@ -22,7 +23,7 @@ onMounted(async () => {
 
 <template>
   <div class="mx-auto max-w-2xl">
-    <div class="mb-10 text-center">
+    <div class="mb-8 text-center sm:mb-10">
       <p class="section-subtitle">LEADERBOARD</p>
       <h1 class="section-title">總排行榜</h1>
       <p class="text-sm font-light text-ink-600">累計所有已結束場次的得分</p>
@@ -31,12 +32,18 @@ onMounted(async () => {
     <div v-if="loading" class="flex flex-col items-center gap-4 py-20">
       <div class="loader-ring"></div>
     </div>
-    <div v-else-if="error" class="card p-16 text-center text-blossom-600">{{ error }}</div>
-    <div v-else-if="rows.length === 0" class="card p-16 text-center font-light text-ink-400">
+    <div v-else-if="error" class="card p-10 text-center text-blossom-600 sm:p-16">{{ error }}</div>
+    <div v-else-if="rows.length === 0" class="card p-10 text-center font-light text-ink-400 sm:p-16">
       還沒有完賽的紀錄，快去開一場遊戲吧
     </div>
 
-    <ul v-else class="card divide-y divide-blossom-200 px-6 py-2 sm:px-8">
+    <TopThreeChart v-else-if="rows.length" :rows="rows" :me-id="session.currentUser?.id" />
+
+    <!-- 完整名次同時也是圖表的表格版本 -->
+    <ul
+      v-if="!loading && !error && rows.length"
+      class="card mt-6 divide-y divide-blossom-200 px-5 py-2 sm:px-8"
+    >
       <li
         v-for="(row, i) in rows"
         :key="row.user_id"

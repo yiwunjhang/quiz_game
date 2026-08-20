@@ -71,15 +71,15 @@ async function choose(i: number) {
     <p class="section-subtitle">CONNECTING</p>
   </div>
 
-  <div v-else-if="!state" class="card mx-auto max-w-md p-10 text-center">
+  <div v-else-if="!state" class="card mx-auto max-w-md p-7 text-center sm:p-10">
     <p class="text-blossom-600">{{ error || '找不到這場遊戲' }}</p>
     <button class="btn btn-ghost mt-6" @click="router.push({ name: 'home' })">回首頁</button>
   </div>
 
-  <div v-else class="mx-auto max-w-2xl space-y-6">
+  <div v-else class="mx-auto max-w-2xl space-y-5 sm:space-y-6">
     <!-- ============ 等待開始 ============ -->
     <template v-if="phase === 'lobby'">
-      <div class="card animate-fade-up p-10 text-center">
+      <div class="card animate-fade-up p-7 text-center sm:p-10">
         <p class="section-subtitle">WELCOME</p>
         <h1 class="mt-3 font-serif text-2xl text-blossom-600">
           {{ session.currentUser?.nickname }}，你已經入座
@@ -92,7 +92,7 @@ async function choose(i: number) {
         </p>
       </div>
 
-      <div class="card p-6">
+      <div class="card p-5 sm:p-6">
         <p class="section-subtitle mb-4 text-left">PLAYERS</p>
         <div class="flex flex-wrap gap-2">
           <span
@@ -118,14 +118,14 @@ async function choose(i: number) {
         <span>SCORE {{ state.my_score ?? 0 }}</span>
       </div>
 
-      <div class="card flex items-center gap-5 p-7">
+      <div class="card flex items-center gap-4 p-5 sm:gap-5 sm:p-7">
         <TimerRing :seconds="remainingSec" :ratio="remainingRatio" :size="76" />
         <h2 class="flex-1 font-serif text-xl leading-snug text-ink-900 sm:text-2xl">
           {{ question?.text }}
         </h2>
       </div>
 
-      <div v-if="answered" class="card animate-fade-up p-10 text-center">
+      <div v-if="answered" class="card animate-fade-up p-7 text-center sm:p-10">
         <p class="section-subtitle">ANSWER SUBMITTED</p>
         <p class="mt-3 font-serif text-xl text-blossom-600">已送出答案</p>
         <p class="mt-2 text-sm font-light text-ink-600">
@@ -133,7 +133,7 @@ async function choose(i: number) {
         </p>
       </div>
 
-      <div v-else class="grid gap-4 sm:grid-cols-2">
+      <div v-else class="grid gap-3 sm:grid-cols-2 sm:gap-4">
         <OptionTile
           v-for="(opt, i) in question?.options ?? []"
           :key="i"
@@ -149,7 +149,7 @@ async function choose(i: number) {
 
     <!-- ============ 公布答案 ============ -->
     <template v-else-if="phase === 'reveal'">
-      <div class="card animate-fade-up p-8 text-center">
+      <div class="card animate-fade-up p-6 text-center sm:p-8">
         <template v-if="!myAnswer">
           <p class="section-subtitle">TIME UP</p>
           <p class="mt-3 font-serif text-xl text-ink-600">時間到，這題沒作答</p>
@@ -170,7 +170,7 @@ async function choose(i: number) {
         </p>
       </div>
 
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-3 sm:grid-cols-2 sm:gap-4">
         <OptionTile
           v-for="(opt, i) in question?.options ?? []"
           :key="i"
@@ -184,7 +184,7 @@ async function choose(i: number) {
         />
       </div>
 
-      <div class="card p-6">
+      <div class="card p-5 sm:p-6">
         <p class="section-subtitle mb-2 text-left">STANDINGS</p>
         <RankList :players="players" :me-id="meId" :limit="5" />
       </div>
@@ -196,7 +196,7 @@ async function choose(i: number) {
 
     <!-- ============ 結算 ============ -->
     <template v-else>
-      <div class="card p-8 text-center sm:p-10">
+      <div class="card p-6 text-center sm:p-10">
         <p class="section-subtitle">FINAL RESULT</p>
         <h2 class="section-title">遊戲結束</h2>
         <p class="mb-10 text-sm font-light text-ink-600">
@@ -205,7 +205,7 @@ async function choose(i: number) {
         <Podium :players="players" :me-id="meId" />
       </div>
 
-      <div class="flex justify-center gap-4">
+      <div class="flex flex-wrap justify-center gap-3">
         <button class="btn btn-primary" @click="router.push({ name: 'home' })">回首頁</button>
         <button class="btn btn-ghost" @click="router.push({ name: 'leaderboard' })">
           總排行榜

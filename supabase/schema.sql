@@ -18,9 +18,38 @@ drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles
   for select using (auth.uid() = id);
 
+-- 註冊時只能建立「非管理者」的自己。
+-- 少了 is_admin = false 這個條件，任何人都能在第一次 insert 時直接夾帶
+-- is_admin: true 自行開通主持人權限（policy 只擋 id，不會擋其他欄位）。
+-- profiles 沒有 update policy，所以之後也改不動，只能靠審核流程開通。
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
-  for insert with check (auth.uid() = id);
+  for insert with check (auth.uid() = id and is_admin = false);
+
+-- ---------- host_applications：主持人權限申請與審核 ----------
+create table if not exists public.host_applications (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  nickname text not null,
+  reason text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now(),
+  reviewed_by uuid references auth.users(id) on delete set null,
+  reviewed_at timestamptz,
+  review_note text
+);
+
+-- 同一個帳號同時只能有一筆待審，被婉拒後可以再申請
+create unique index if not exists host_applications_one_pending
+  on public.host_applications (user_id) where status = 'pending';
+
+alter table public.host_applications enable row level security;
+
+-- 申請人只讀得到自己那幾筆；審核端一律走下方的 security definer 函式。
+-- 沒有 insert / update policy，所以狀態無法自己改。
+drop policy if exists "host_applications_select_own" on public.host_applications;
+create policy "host_applications_select_own" on public.host_applications
+  for select using (user_id = auth.uid());
 
 -- ---------- questions：題庫（僅管理者可讀寫） ----------
 create table if not exists public.questions (
@@ -544,7 +573,151 @@ as $$
   order by 3 desc, 4 asc;
 $$;
 
+-- =====================================================================
+-- 主持人權限：申請 / 審核
+-- 開通 is_admin 的唯一途徑就是這裡，且只有現任主持人能核准。
+-- =====================================================================
+
+drop function if exists public.apply_for_host(text);
+drop function if exists public.get_my_host_application();
+drop function if exists public.list_host_applications();
+drop function if exists public.review_host_application(bigint, boolean, text);
+
+-- ---------- 提出申請（任何登入者） ----------
+create or replace function public.apply_for_host(p_reason text default '')
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_nick text;
+  v_admin boolean;
+begin
+  if auth.uid() is null then
+    raise exception '尚未登入';
+  end if;
+
+  select nickname, is_admin into v_nick, v_admin
+  from public.profiles where id = auth.uid();
+
+  if coalesce(v_admin, false) then
+    return jsonb_build_object('status', 'approved', 'already_admin', true);
+  end if;
+
+  if exists (
+    select 1 from public.host_applications
+    where user_id = auth.uid() and status = 'pending'
+  ) then
+    return jsonb_build_object('status', 'pending', 'duplicate', true);
+  end if;
+
+  insert into public.host_applications (user_id, nickname, reason)
+  values (auth.uid(), coalesce(v_nick, '未命名'), left(coalesce(p_reason, ''), 500));
+
+  return jsonb_build_object('status', 'pending');
+end;
+$$;
+
+-- ---------- 查自己最近一筆申請的狀態 ----------
+create or replace function public.get_my_host_application()
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'status', a.status,
+    'created_at', a.created_at,
+    'review_note', a.review_note
+  )
+  from public.host_applications a
+  where a.user_id = auth.uid()
+  order by a.created_at desc
+  limit 1;
+$$;
+
+-- ---------- 審核端：列出所有申請（待審的排前面） ----------
+create or replace function public.list_host_applications()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.profiles p where p.id = auth.uid() and p.is_admin
+  ) then
+    raise exception '只有主持人可以查看申請';
+  end if;
+
+  return coalesce((
+    select jsonb_agg(
+      jsonb_build_object(
+        'id', a.id,
+        'nickname', a.nickname,
+        'reason', a.reason,
+        'status', a.status,
+        'created_at', a.created_at,
+        'reviewed_at', a.reviewed_at,
+        'review_note', a.review_note
+      )
+      order by (a.status = 'pending') desc, a.created_at desc
+    )
+    from public.host_applications a
+  ), '[]'::jsonb);
+end;
+$$;
+
+-- ---------- 審核端：核准 / 婉拒 ----------
+create or replace function public.review_host_application(
+  p_id bigint,
+  p_approve boolean,
+  p_note text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  a public.host_applications%rowtype;
+begin
+  if not exists (
+    select 1 from public.profiles p where p.id = auth.uid() and p.is_admin
+  ) then
+    raise exception '只有主持人可以審核申請';
+  end if;
+
+  select * into a from public.host_applications where id = p_id for update;
+  if a.id is null then
+    raise exception '找不到這筆申請';
+  end if;
+  if a.status <> 'pending' then
+    raise exception '這筆申請已經審核過了';
+  end if;
+
+  update public.host_applications
+  set status = case when p_approve then 'approved' else 'rejected' end,
+      reviewed_by = auth.uid(),
+      reviewed_at = now(),
+      review_note = nullif(trim(coalesce(p_note, '')), '')
+  where id = p_id;
+
+  -- 這是全系統唯一會把 is_admin 設為 true 的地方
+  if p_approve then
+    update public.profiles set is_admin = true where id = a.user_id;
+  end if;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
 -- ---------- 授權 ----------
+grant execute on function public.apply_for_host(text) to authenticated;
+grant execute on function public.get_my_host_application() to authenticated;
+grant execute on function public.list_host_applications() to authenticated;
+grant execute on function public.review_host_application(bigint, boolean, text) to authenticated;
 grant execute on function public.create_game(int, int) to authenticated;
 grant execute on function public.join_game(text) to authenticated;
 grant execute on function public.get_game_state(uuid) to authenticated;

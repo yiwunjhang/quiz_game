@@ -12,9 +12,10 @@ async function logout() {
 </script>
 
 <template>
-  <div class="flex min-h-full flex-col bg-blossom-50">
+  <!-- 不設底色，讓 body 的底色與紋理透出來 -->
+  <div class="flex min-h-full flex-col">
     <header class="sticky top-0 z-20 border-b border-blossom-200 bg-white/95 backdrop-blur-sm">
-      <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-4">
+      <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4">
         <RouterLink
           to="/"
           class="font-serif text-xl text-blossom-600 transition-colors duration-300 hover:text-blossom-700"
@@ -25,7 +26,7 @@ async function logout() {
           </span>
         </RouterLink>
 
-        <nav class="flex items-center gap-5 text-sm sm:gap-7">
+        <nav class="flex flex-none items-center gap-4 text-sm sm:gap-7">
           <RouterLink
             to="/leaderboard"
             class="nav-link tracking-widest text-ink-600 transition-colors duration-300 hover:text-blossom-600"
@@ -48,14 +49,14 @@ async function logout() {
       </div>
     </header>
 
-    <main class="mx-auto w-full max-w-5xl flex-1 px-6 py-12">
+    <main class="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
       <RouterView />
     </main>
 
-    <footer class="border-t border-blossom-200 py-8 text-center">
+    <footer class="border-t border-blossom-200 py-6 text-center sm:py-8">
       <p class="font-serif text-base text-blossom-500">Quiz Party</p>
       <p class="mt-1 text-xs tracking-[0.2em] text-ink-400">
-        Vue 3 · Supabase Realtime · GitHub Pages
+        © 2026 Risa 怡雯. All rights reserved.
       </p>
     </footer>
   </div>

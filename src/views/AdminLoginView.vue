@@ -1,19 +1,27 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { adminLogin, registerOrLogin } from '../db/api'
+import { adminLogin, applyForHost, logout as apiLogout, registerOrLogin } from '../db/api'
 import { useSessionStore } from '../stores/session'
 
 const router = useRouter()
 const session = useSessionStore()
 
+const mode = ref<'login' | 'apply'>('login')
 const nickname = ref('')
 const password = ref('')
+const reason = ref('')
 const error = ref('')
 const message = ref('')
 const loading = ref(false)
 
-async function submit() {
+function switchTo(m: 'login' | 'apply') {
+  mode.value = m
+  error.value = ''
+  message.value = ''
+}
+
+async function submitLogin() {
   error.value = ''
   message.value = ''
   loading.value = true
@@ -29,10 +37,11 @@ async function submit() {
 }
 
 /**
- * 建立第一個主持人帳號用。首頁只給參加者加入遊戲，沒有註冊入口，
- * 所以帳號在這裡開；管理權限仍需到 Supabase 手動把 is_admin 設為 true。
+ * 申請成為主持人。
+ * 這裡只會建立（或登入）一般玩家帳號並送出申請，不會給任何權限；
+ * is_admin 只有現任主持人在後台核准後才會開通。
  */
-async function register() {
+async function submitApply() {
   error.value = ''
   message.value = ''
   loading.value = true
@@ -43,10 +52,14 @@ async function register() {
       router.push({ name: 'admin-games' })
       return
     }
-    await session.logout()
-    message.value = `帳號「${user.nickname}」已建立，請依下方說明在 Supabase 開通管理權限後再登入。`
+    const status = await applyForHost(reason.value)
+    await apiLogout()
+    message.value =
+      status === 'pending'
+        ? `申請已送出，帳號「${user.nickname}」需等現任主持人核准後才能登入後台。`
+        : '你已經有主持人權限了，請改用登入。'
   } catch (e: any) {
-    error.value = e?.message ?? '建立帳號失敗'
+    error.value = e?.message ?? '申請失敗'
   } finally {
     loading.value = false
   }
@@ -55,43 +68,69 @@ async function register() {
 
 <template>
   <div class="mx-auto max-w-sm">
-    <div class="card animate-fade-up p-8">
-      <div class="mb-7 text-center">
+    <div class="card animate-fade-up p-6 sm:p-8">
+      <div class="mb-6 text-center">
         <p class="section-subtitle">ADMIN</p>
-        <h1 class="font-serif text-2xl text-blossom-600">後台登入</h1>
-        <p class="mt-1 text-sm font-light text-ink-600">以具備管理權限的帳號登入，即可建立遊戲與管理題庫</p>
+        <h1 class="font-serif text-2xl text-blossom-600">主持人後台</h1>
       </div>
 
-      <form class="space-y-5" @submit.prevent="submit">
+      <div class="mb-6 flex justify-center gap-8 border-b border-blossom-200 pb-3">
+        <button
+          v-for="m in (['login', 'apply'] as const)"
+          :key="m"
+          type="button"
+          class="nav-link pb-1 text-sm tracking-widest transition-colors duration-300"
+          :class="mode === m ? 'is-active text-blossom-600' : 'text-ink-400 hover:text-blossom-500'"
+          @click="switchTo(m)"
+        >
+          {{ m === 'login' ? '登入' : '申請權限' }}
+        </button>
+      </div>
+
+      <form class="space-y-4" @submit.prevent="mode === 'login' ? submitLogin() : submitApply()">
         <div>
-          <label class="mb-2 block text-xs tracking-widest text-ink-400">主持人暱稱</label>
-          <input v-model="nickname" type="text" placeholder="管理帳號暱稱" class="field" />
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">暱稱</label>
+          <input
+            v-model="nickname"
+            type="text"
+            autocomplete="username"
+            placeholder="帳號暱稱"
+            class="field"
+          />
         </div>
         <div>
           <label class="mb-2 block text-xs tracking-widest text-ink-400">密碼</label>
-          <input v-model="password" type="password" placeholder="密碼" class="field" />
+          <input
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="密碼"
+            class="field"
+          />
+        </div>
+
+        <div v-if="mode === 'apply'">
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">申請說明</label>
+          <textarea
+            v-model="reason"
+            rows="3"
+            maxlength="500"
+            placeholder="你是誰、想用來辦什麼活動，方便現任主持人判斷"
+            class="field"
+          ></textarea>
         </div>
 
         <p v-if="error" class="text-sm text-blossom-600">{{ error }}</p>
         <p v-if="message" class="text-sm text-sage-600">{{ message }}</p>
 
         <button type="submit" :disabled="loading" class="btn btn-primary w-full">
-          {{ loading ? '登入中…' : '登入' }}
-        </button>
-        <button
-          type="button"
-          :disabled="loading"
-          class="w-full text-xs tracking-widest text-ink-400 transition-colors duration-300 hover:text-blossom-600"
-          @click="register"
-        >
-          還沒有帳號？建立主持人帳號
+          <template v-if="loading">處理中…</template>
+          <template v-else>{{ mode === 'login' ? '登入' : '送出申請' }}</template>
         </button>
       </form>
 
-      <p class="mt-6 text-xs font-light leading-relaxed text-ink-400">
-        管理權限需在 Supabase 將該帳號
-        <code class="rounded bg-blossom-100 px-1 text-blossom-600">profiles.is_admin</code>
-        設為 true，詳見 README。
+      <p v-if="mode === 'apply'" class="mt-5 text-xs font-light leading-relaxed text-ink-400">
+        送出後帳號只是一般玩家，需由現任主持人在後台核准才會取得建立遊戲與管理題庫的權限。
       </p>
     </div>
   </div>

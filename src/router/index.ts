@@ -43,6 +43,13 @@ const router = createRouter({
       component: () => import('../views/AdminQuestionsView.vue'),
       meta: { requiresAdmin: true },
     },
+    {
+      // 審核他人的主持人權限申請
+      path: '/admin/applications',
+      name: 'admin-applications',
+      component: () => import('../views/AdminApplicationsView.vue'),
+      meta: { requiresAdmin: true },
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
