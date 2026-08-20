@@ -58,6 +58,19 @@ export interface GameState {
   stats: number[] | null
 }
 
+export type HostApplicationStatus = 'pending' | 'approved' | 'rejected'
+
+/** 主持人權限申請 */
+export interface HostApplication {
+  id: number
+  nickname: string
+  reason: string
+  status: HostApplicationStatus
+  created_at: string
+  reviewed_at: string | null
+  review_note: string | null
+}
+
 export interface GlobalRankRow {
   user_id: string
   nickname: string
@@ -147,6 +160,7 @@ export async function registerOrLogin(nickname: string, password: string): Promi
 
 /**
  * 後台登入：只登入既有帳號，並驗證是否具備管理權限。
+ * 沒有權限時順便把申請狀態一起說清楚，免得申請人只看到「沒有權限」而不知道還在等審核。
  */
 export async function adminLogin(nickname: string, password: string): Promise<AppUser> {
   const name = nickname.trim()
@@ -157,10 +171,70 @@ export async function adminLogin(nickname: string, password: string): Promise<Ap
   const uid = data.user.id
   const prof = await fetchProfile(uid)
   if (!prof?.is_admin) {
+    // 還登入著才查得到自己的申請，查完再登出
+    const app = await getMyHostApplication().catch(() => null)
     await supabase.auth.signOut()
-    throw new Error('此帳號沒有管理權限')
+    if (app?.status === 'pending') {
+      throw new Error('你的主持人申請審核中，請等待現任主持人核准')
+    }
+    if (app?.status === 'rejected') {
+      throw new Error('你的主持人申請未通過' + (app.review_note ? `：${app.review_note}` : ''))
+    }
+    throw new Error('此帳號沒有管理權限，可從下方申請成為主持人')
   }
   return { id: uid, nickname: prof.nickname, isAdmin: true }
+}
+
+/* ------------------------------------------------------------------ */
+/* 主持人權限：申請 / 審核                                              */
+/* ------------------------------------------------------------------ */
+
+/** 提出主持人申請（需先登入；帳號本身仍是一般玩家） */
+export async function applyForHost(reason: string): Promise<HostApplicationStatus> {
+  const { data, error } = await supabase.rpc('apply_for_host', { p_reason: reason.trim() })
+  if (error) throw new Error(error.message)
+  return (firstRow(data)?.status ?? 'pending') as HostApplicationStatus
+}
+
+/** 我最近一筆申請的狀態 */
+export async function getMyHostApplication(): Promise<{
+  status: HostApplicationStatus
+  review_note: string | null
+} | null> {
+  const { data, error } = await supabase.rpc('get_my_host_application')
+  if (error) throw new Error(error.message)
+  const row = firstRow(data)
+  if (!row?.status) return null
+  return { status: row.status, review_note: row.review_note ?? null }
+}
+
+/** 審核端：列出所有申請（待審的排前面） */
+export async function listHostApplications(): Promise<HostApplication[]> {
+  const { data, error } = await supabase.rpc('list_host_applications')
+  if (error) throw new Error(error.message)
+  return ((Array.isArray(data) ? data : (data ?? [])) as any[]).map((r) => ({
+    id: Number(r.id),
+    nickname: String(r.nickname),
+    reason: String(r.reason ?? ''),
+    status: r.status as HostApplicationStatus,
+    created_at: String(r.created_at),
+    reviewed_at: r.reviewed_at ?? null,
+    review_note: r.review_note ?? null,
+  }))
+}
+
+/** 審核端：核准或婉拒 */
+export async function reviewHostApplication(
+  id: number,
+  approve: boolean,
+  note?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('review_host_application', {
+    p_id: id,
+    p_approve: approve,
+    p_note: note?.trim() || null,
+  })
+  if (error) throw new Error(error.message)
 }
 
 /** 還原目前登入狀態（重新整理後） */
