@@ -58,6 +58,19 @@ export interface GameState {
   stats: number[] | null
 }
 
+/** 後台場次清單的一列 */
+export interface HostedGame {
+  id: string
+  pin: string
+  status: GamePhase
+  question_count: number
+  player_count: number
+  /** 這場是否計入總排行榜 */
+  show_on_leaderboard: boolean
+  created_at: string
+  ended_at: string | null
+}
+
 export type HostApplicationStatus = 'pending' | 'approved' | 'rejected'
 
 /** 主持人權限申請 */
@@ -394,6 +407,43 @@ export async function getMyActiveGame(): Promise<{ gameId: string; pin: string; 
   } catch {
     return null
   }
+}
+
+/** 我主持過的所有場次（後台管理用） */
+export async function listMyGames(): Promise<HostedGame[]> {
+  const { data, error } = await supabase.rpc('list_my_games')
+  if (error) throw new Error(error.message)
+  return ((Array.isArray(data) ? data : (data ?? [])) as any[]).map((r) => ({
+    id: String(r.id),
+    pin: String(r.pin ?? ''),
+    status: r.status as GamePhase,
+    question_count: Number(r.question_count ?? 0),
+    player_count: Number(r.player_count ?? 0),
+    show_on_leaderboard: r.show_on_leaderboard !== false,
+    created_at: String(r.created_at),
+    ended_at: r.ended_at ?? null,
+  }))
+}
+
+/**
+ * 刪除場次，回傳一併移除的玩家紀錄數。
+ * 子表都是 on delete cascade，所以排行榜（彙總 game_players）會自動不再計入這一場。
+ */
+export async function deleteGame(gameId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('delete_game', {
+    p_game_id: assertUuid(gameId, '刪除場次失敗'),
+  })
+  if (error) throw new Error(error.message)
+  return Number(firstRow(data)?.removed_players ?? 0)
+}
+
+/** 切換某場次要不要列入總排行榜 */
+export async function setGameLeaderboard(gameId: string, show: boolean): Promise<void> {
+  const { error } = await supabase.rpc('set_game_leaderboard', {
+    p_game_id: assertUuid(gameId, '設定失敗'),
+    p_show: show,
+  })
+  if (error) throw new Error(error.message)
 }
 
 /** 總排行榜：累計所有已結束場次的得分 */

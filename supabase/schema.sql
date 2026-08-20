@@ -83,8 +83,14 @@ create table if not exists public.games (
   seconds_per_question int not null default 20,
   question_started_at timestamptz,
   created_at timestamptz not null default now(),
-  ended_at timestamptz
+  ended_at timestamptz,
+  -- 這場結束後要不要計入總排行榜。預設列入，主持人可在後台取消勾選。
+  show_on_leaderboard boolean not null default true
 );
+
+-- 舊資料庫補上欄位；預設 true，所以既有場次維持原本就會出現在排行榜的行為
+alter table public.games
+  add column if not exists show_on_leaderboard boolean not null default true;
 
 -- 遊戲代碼只在「進行中的遊戲」之間唯一，結束後可被重複使用
 create unique index if not exists games_pin_active on public.games (pin) where status <> 'ended';
@@ -191,6 +197,9 @@ drop function if exists public.submit_live_answer(uuid, int);
 drop function if exists public.host_action(uuid, text);
 drop function if exists public.get_my_active_game();
 drop function if exists public.get_global_leaderboard();
+drop function if exists public.list_my_games();
+drop function if exists public.delete_game(uuid);
+drop function if exists public.set_game_leaderboard(uuid, boolean);
 
 -- ---------- 建立遊戲（限後台主持人帳號，即 profiles.is_admin = true） ----------
 create or replace function public.create_game(p_seconds int default 20, p_count int default 10)
@@ -545,7 +554,95 @@ as $$
   limit 1;
 $$;
 
--- ---------- 總排行榜：累計所有已結束場次的得分 ----------
+-- ---------- 我主持過的所有場次 ----------
+create or replace function public.list_my_games()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception '尚未登入';
+  end if;
+
+  return coalesce((
+    select jsonb_agg(
+      jsonb_build_object(
+        'id', g.id,
+        'pin', g.pin,
+        'status', g.status,
+        'question_count', coalesce(array_length(g.question_ids, 1), 0),
+        'player_count', (select count(*) from public.game_players gp where gp.game_id = g.id),
+        'show_on_leaderboard', g.show_on_leaderboard,
+        'created_at', g.created_at,
+        'ended_at', g.ended_at
+      )
+      order by g.created_at desc
+    )
+    from public.games g
+    where g.host_id = auth.uid()
+  ), '[]'::jsonb);
+end;
+$$;
+
+-- ---------- 刪除場次 ----------
+-- game_players / game_answers 都是 on delete cascade，所以刪掉這一列，
+-- 該場次的玩家與作答紀錄會一起消失；排行榜彙總的就是 game_players，
+-- 因此刪除後排行榜會自動不再計入這一場。
+create or replace function public.delete_game(p_game_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  g public.games%rowtype;
+  v_players int;
+begin
+  select * into g from public.games where id = p_game_id;
+  if g.id is null then
+    raise exception '找不到這場遊戲';
+  end if;
+  if g.host_id <> auth.uid() then
+    raise exception '只能刪除自己主持的場次';
+  end if;
+
+  select count(*) into v_players from public.game_players where game_id = g.id;
+
+  delete from public.games where id = p_game_id;
+
+  return jsonb_build_object('ok', true, 'removed_players', v_players);
+end;
+$$;
+
+-- ---------- 切換某場次要不要列入排行榜 ----------
+create or replace function public.set_game_leaderboard(p_game_id uuid, p_show boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  g public.games%rowtype;
+begin
+  select * into g from public.games where id = p_game_id;
+  if g.id is null then
+    raise exception '找不到這場遊戲';
+  end if;
+  if g.host_id <> auth.uid() then
+    raise exception '只能調整自己主持的場次';
+  end if;
+
+  update public.games
+  set show_on_leaderboard = coalesce(p_show, true)
+  where id = p_game_id;
+
+  return jsonb_build_object('ok', true, 'show_on_leaderboard', coalesce(p_show, true));
+end;
+$$;
+
+-- ---------- 總排行榜：累計「已結束且列入排行榜」場次的得分 ----------
 create or replace function public.get_global_leaderboard()
 returns table (
   user_id uuid,
@@ -567,7 +664,10 @@ as $$
     max(gp.score)             as best_score,
     sum(gp.correct_count)::bigint as correct_total
   from public.game_players gp
-  join public.games g on g.id = gp.game_id and g.status = 'ended'
+  join public.games g
+    on g.id = gp.game_id
+   and g.status = 'ended'
+   and g.show_on_leaderboard
   group by gp.user_id
   -- 用序號排序，避免輸出欄位名稱與 returns table 的參數名互相衝突
   order by 3 desc, 4 asc;
@@ -724,6 +824,9 @@ grant execute on function public.get_game_state(uuid) to authenticated;
 grant execute on function public.submit_live_answer(uuid, int) to authenticated;
 grant execute on function public.host_action(uuid, text) to authenticated;
 grant execute on function public.get_my_active_game() to authenticated;
+grant execute on function public.list_my_games() to authenticated;
+grant execute on function public.delete_game(uuid) to authenticated;
+grant execute on function public.set_game_leaderboard(uuid, boolean) to authenticated;
 grant execute on function public.get_global_leaderboard() to anon, authenticated;
 
 -- =====================================================================
