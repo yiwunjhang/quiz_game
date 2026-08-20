@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import AdminNav from '../components/AdminNav.vue'
 import {
   getQuestionsAdmin,
   addQuestion,
@@ -8,10 +8,6 @@ import {
   deleteQuestion,
   type Question,
 } from '../db/api'
-import { useSessionStore } from '../stores/session'
-
-const router = useRouter()
-const session = useSessionStore()
 
 const questions = ref<Question[]>([])
 const editingId = ref<number | null>(null)
@@ -95,11 +91,6 @@ async function remove(q: Question) {
   }
 }
 
-async function logout() {
-  await session.logout()
-  router.push({ name: 'home' })
-}
-
 /* ---- 匯出 / 匯入 ---- */
 function exportJson() {
   const data = JSON.stringify(
@@ -151,13 +142,7 @@ async function importJson(e: Event) {
 
 <template>
   <div class="space-y-8">
-    <div class="flex items-center justify-between border-b border-blossom-200 pb-4">
-      <div>
-        <p class="section-subtitle text-left">ADMIN</p>
-        <h1 class="font-serif text-2xl text-blossom-600">題庫管理</h1>
-      </div>
-      <button class="btn btn-ghost btn-sm" @click="logout">登出後台</button>
-    </div>
+    <AdminNav title="題庫管理" />
 
     <!-- 表單 -->
     <div class="card p-7">

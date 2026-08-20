@@ -4,7 +4,7 @@ import { supabase } from '../supabase'
 import { getGameState, type GamePhase, type GameState } from '../db/api'
 
 /**
- * 訂閱一個房間的即時狀態。
+ * 訂閱一場遊戲的即時狀態。
  *
  * 三層保險，確保所有人畫面同步：
  *  1. Supabase Realtime：主持人切換題目 / 有人加入時立刻推播
@@ -111,7 +111,7 @@ export function useGame(gameId: string) {
 
   async function subscribeRealtime() {
     try {
-      // Realtime 也要帶 JWT，RLS 才會把房間的變更推給這位使用者
+      // Realtime 也要帶 JWT，RLS 才會把遊戲的變更推給這位使用者
       const { data } = await supabase.auth.getSession()
       const token = data.session?.access_token
       if (token) await Promise.resolve(supabase.realtime.setAuth(token))

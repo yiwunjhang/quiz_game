@@ -1,23 +1,20 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { createGame, getMyActiveGame, joinGame, registerOrLogin } from '../db/api'
+import { getMyActiveGame, joinGame, registerOrLogin } from '../db/api'
 import { useSessionStore } from '../stores/session'
 import { supabaseConfigured } from '../supabase'
 
 const router = useRouter()
 const session = useSessionStore()
 
-const mode = ref<'join' | 'host'>('join')
 const pin = ref('')
 const nickname = ref('')
 const password = ref('')
-const seconds = ref(20)
-const questionCount = ref(10)
 const error = ref('')
 const loading = ref(false)
 
-/** 進行中的房間（重新整理或不小心離開時可回到現場） */
+/** 進行中的遊戲（重新整理或不小心離開時可回到現場） */
 const active = ref<{ gameId: string; pin: string; isHost: boolean } | null>(null)
 
 async function checkActive() {
@@ -50,18 +47,11 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    if (mode.value === 'join' && pin.value.trim().length < 4) {
-      throw new Error('請輸入主持人畫面上的 6 位數房間代碼')
+    if (pin.value.trim().length < 4) {
+      throw new Error('請輸入主持人畫面上的 6 位數遊戲代碼')
     }
     await ensureLogin()
-
-    if (mode.value === 'join') {
-      const gameId = await joinGame(pin.value)
-      goToGame(gameId, false)
-    } else {
-      const { gameId } = await createGame(seconds.value, questionCount.value)
-      goToGame(gameId, true)
-    }
+    goToGame(await joinGame(pin.value), false)
   } catch (e: any) {
     error.value = e?.message ?? '發生錯誤'
   } finally {
@@ -79,7 +69,7 @@ async function submit() {
         一起玩<br />即時問答派對
       </h1>
       <p class="max-w-md font-light leading-relaxed text-ink-600">
-        主持人開房間、大家用房間代碼加入，同一時間看同一題、一起搶答。
+        輸入主持人畫面上的代碼就能加入，同一時間看同一題、一起搶答。
         答得越快分數越高，每題結束立刻公布戰況，最後站上頒獎台的會是誰呢？
       </p>
       <ul class="space-y-3 text-sm font-light text-ink-600">
@@ -114,23 +104,14 @@ async function submit() {
         </button>
       </div>
 
-      <!-- 模式切換 -->
-      <div class="mb-7 flex justify-center gap-8 border-b border-blossom-200 pb-3">
-        <button
-          v-for="m in (['join', 'host'] as const)"
-          :key="m"
-          type="button"
-          class="nav-link pb-1 text-sm tracking-widest transition-colors duration-300"
-          :class="mode === m ? 'is-active text-blossom-600' : 'text-ink-400 hover:text-blossom-500'"
-          @click="mode = m"
-        >
-          {{ m === 'join' ? '加入遊戲' : '我要開房間' }}
-        </button>
+      <div class="mb-7 border-b border-blossom-200 pb-3 text-center">
+        <p class="section-subtitle">JOIN</p>
+        <h2 class="font-serif text-xl text-blossom-600">加入遊戲</h2>
       </div>
 
       <form class="space-y-5" @submit.prevent="submit">
-        <div v-if="mode === 'join'">
-          <label class="mb-2 block text-xs tracking-widest text-ink-400">房間代碼</label>
+        <div>
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">遊戲代碼</label>
           <input
             v-model="pin"
             inputmode="numeric"
@@ -138,17 +119,6 @@ async function submit() {
             placeholder="000000"
             class="field field-pin"
           />
-        </div>
-
-        <div v-else class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="mb-2 block text-xs tracking-widest text-ink-400">題數</label>
-            <input v-model.number="questionCount" type="number" min="1" max="50" class="field" />
-          </div>
-          <div>
-            <label class="mb-2 block text-xs tracking-widest text-ink-400">每題秒數</label>
-            <input v-model.number="seconds" type="number" min="5" max="120" class="field" />
-          </div>
         </div>
 
         <div>
@@ -175,9 +145,15 @@ async function submit() {
         <p v-if="error" class="text-sm text-blossom-600">{{ error }}</p>
 
         <button type="submit" :disabled="loading" class="btn btn-primary w-full">
-          {{ loading ? '處理中…' : mode === 'join' ? '加入房間' : '建立房間' }}
+          {{ loading ? '處理中…' : '加入遊戲' }}
         </button>
       </form>
+
+      <p class="mt-6 text-center text-xs font-light text-ink-400">
+        要主持遊戲嗎？請到
+        <RouterLink to="/admin" class="text-blossom-500 hover:text-blossom-600">後台</RouterLink>
+        登入後建立。
+      </p>
     </div>
   </div>
 </template>

@@ -40,10 +40,10 @@ create policy "questions_admin_all" on public.questions
   with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_admin));
 
 -- =====================================================================
--- 即時對戰：房間 / 玩家 / 作答
+-- 即時對戰：遊戲 / 玩家 / 作答
 -- =====================================================================
 
--- ---------- games：一場遊戲（房間） ----------
+-- ---------- games：一場遊戲 ----------
 create table if not exists public.games (
   id uuid primary key default gen_random_uuid(),
   pin text not null,
@@ -57,11 +57,11 @@ create table if not exists public.games (
   ended_at timestamptz
 );
 
--- 房間代碼只在「進行中的房間」之間唯一，結束後可被重複使用
+-- 遊戲代碼只在「進行中的遊戲」之間唯一，結束後可被重複使用
 create unique index if not exists games_pin_active on public.games (pin) where status <> 'ended';
 create index if not exists games_host_idx on public.games (host_id);
 
--- ---------- game_players：房間內的玩家與即時分數 ----------
+-- ---------- game_players：遊戲中的玩家與即時分數 ----------
 create table if not exists public.game_players (
   game_id uuid not null references public.games(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -91,7 +91,7 @@ alter table public.games enable row level security;
 alter table public.game_players enable row level security;
 alter table public.game_answers enable row level security;
 
--- 「我是不是這個房間的成員」。必須是 security definer，policy 才不會因為
+-- 「我是不是這場遊戲的成員」。必須是 security definer，policy 才不會因為
 -- 查詢自己所保護的資料表而觸發 infinite recursion。
 create or replace function public.is_game_member(p_game_id uuid)
 returns boolean
@@ -111,7 +111,7 @@ $$;
 
 grant execute on function public.is_game_member(uuid) to authenticated;
 
--- 只有房主與房內玩家能讀到房間資料（Realtime 推播也依這條規則過濾）
+-- 只有主持人與場內玩家能讀到遊戲資料（Realtime 推播也依這條規則過濾）
 drop policy if exists "games_select_members" on public.games;
 create policy "games_select_members" on public.games
   for select using (public.is_game_member(id));
@@ -163,7 +163,7 @@ drop function if exists public.host_action(uuid, text);
 drop function if exists public.get_my_active_game();
 drop function if exists public.get_global_leaderboard();
 
--- ---------- 建立房間（任何登入者皆可當主持人） ----------
+-- ---------- 建立遊戲（限後台主持人帳號，即 profiles.is_admin = true） ----------
 create or replace function public.create_game(p_seconds int default 20, p_count int default 10)
 returns jsonb
 language plpgsql
@@ -179,6 +179,13 @@ begin
     raise exception '尚未登入';
   end if;
 
+  -- 遊戲一律由主持人在後台建立；前台參加者只能用代碼加入
+  if not exists (
+    select 1 from public.profiles p where p.id = auth.uid() and p.is_admin
+  ) then
+    raise exception '只有後台主持人帳號可以建立遊戲';
+  end if;
+
   select array(
     select q.id from public.questions q order by random() limit greatest(coalesce(p_count, 10), 1)
   ) into v_ids;
@@ -187,7 +194,7 @@ begin
     raise exception '題庫是空的，請先到後台新增題目';
   end if;
 
-  -- 產生不與進行中房間重複的 6 位數代碼
+  -- 產生不與進行中遊戲重複的 6 位數代碼
   loop
     v_pin := lpad((floor(random() * 1000000))::int::text, 6, '0');
     exit when not exists (
@@ -203,7 +210,7 @@ begin
 end;
 $$;
 
--- ---------- 以房間代碼加入 ----------
+-- ---------- 以遊戲代碼加入 ----------
 create or replace function public.join_game(p_pin text)
 returns uuid
 language plpgsql
@@ -225,14 +232,14 @@ begin
   limit 1;
 
   if v_game.id is null then
-    raise exception '找不到這個房間代碼，請確認主持人畫面上的號碼';
+    raise exception '找不到這個遊戲代碼，請確認主持人畫面上的號碼';
   end if;
 
   if v_game.host_id = auth.uid() then
     return v_game.id;  -- 主持人直接回到自己的控台
   end if;
 
-  -- 遊戲開始後只允許已在房內的玩家重新連線
+  -- 遊戲開始後只允許已在場內的玩家重新連線
   if v_game.status <> 'lobby'
      and not exists (
        select 1 from public.game_players
@@ -251,7 +258,7 @@ begin
 end;
 $$;
 
--- ---------- 讀取房間即時狀態（玩家/主持人共用） ----------
+-- ---------- 讀取遊戲即時狀態（玩家/主持人共用） ----------
 create or replace function public.get_game_state(p_game_id uuid)
 returns jsonb
 language plpgsql
@@ -268,14 +275,14 @@ declare
 begin
   select * into g from public.games where id = p_game_id;
   if g.id is null then
-    raise exception '房間不存在或已結束';
+    raise exception '遊戲不存在或已結束';
   end if;
 
   v_is_host := (g.host_id = auth.uid());
   if not v_is_host and not exists (
     select 1 from public.game_players where game_id = g.id and user_id = auth.uid()
   ) then
-    raise exception '你不在這個房間裡';
+    raise exception '你不在這場遊戲裡';
   end if;
 
   if g.current_index >= 0 then
@@ -378,7 +385,7 @@ begin
 
   select * into g from public.games where id = p_game_id;
   if g.id is null then
-    raise exception '房間不存在';
+    raise exception '遊戲不存在';
   end if;
   if g.status <> 'question' or g.question_started_at is null then
     raise exception '現在不是作答時間';
@@ -386,7 +393,7 @@ begin
   if not exists (
     select 1 from public.game_players where game_id = g.id and user_id = auth.uid()
   ) then
-    raise exception '你不在這個房間裡';
+    raise exception '你不在這場遊戲裡';
   end if;
 
   v_qid := g.question_ids[g.current_index + 1];
@@ -446,7 +453,7 @@ declare
 begin
   select * into g from public.games where id = p_game_id for update;
   if g.id is null then
-    raise exception '房間不存在';
+    raise exception '遊戲不存在';
   end if;
   if g.host_id <> auth.uid() then
     raise exception '只有主持人可以控制遊戲';
@@ -488,7 +495,7 @@ begin
 end;
 $$;
 
--- ---------- 我主持中／參加中的房間（重新整理後可回到現場） ----------
+-- ---------- 我主持中／參加中的遊戲（重新整理後可回到現場） ----------
 create or replace function public.get_my_active_game()
 returns jsonb
 language sql
