@@ -22,7 +22,7 @@ export interface Question extends PublicQuestion {
   correct_index: number
 }
 
-/** 房間內的玩家（依分數排序） */
+/** 遊戲中的玩家（依分數排序） */
 export interface GamePlayer {
   user_id: string
   nickname: string
@@ -232,12 +232,12 @@ function firstRow(data: any): any {
 function assertUuid(value: any, what: string): string {
   const id = value == null ? '' : String(value)
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-    throw new Error(`${what}（伺服器沒有回傳有效的房間編號）。${SCHEMA_HINT}`)
+    throw new Error(`${what}（伺服器沒有回傳有效的遊戲編號）。${SCHEMA_HINT}`)
   }
   return id
 }
 
-/** 建立房間，回傳房間 id 與 6 位數代碼 */
+/** 建立遊戲，回傳遊戲 id 與 6 位數代碼 */
 export async function createGame(
   seconds: number,
   questionCount: number,
@@ -249,27 +249,27 @@ export async function createGame(
   if (error) throw new Error(error.message)
   const row = firstRow(data)
   return {
-    gameId: assertUuid(row?.game_id, '建立房間失敗'),
+    gameId: assertUuid(row?.game_id, '建立遊戲失敗'),
     pin: String(row?.pin ?? ''),
   }
 }
 
-/** 以房間代碼加入，回傳房間 id */
+/** 以遊戲代碼加入，回傳遊戲 id */
 export async function joinGame(pin: string): Promise<string> {
   const { data, error } = await supabase.rpc('join_game', { p_pin: pin.trim() })
   if (error) throw new Error(error.message)
   // 舊版簽章可能回傳單列資料表，一併相容
   const value = typeof data === 'object' && data !== null ? firstRow(data)?.join_game : data
-  return assertUuid(value ?? data, '加入房間失敗')
+  return assertUuid(value ?? data, '加入遊戲失敗')
 }
 
-/** 讀取房間即時狀態 */
+/** 讀取遊戲即時狀態 */
 export async function getGameState(gameId: string): Promise<GameState> {
-  const id = assertUuid(gameId, '無法讀取房間')
+  const id = assertUuid(gameId, '無法讀取遊戲狀態')
   const { data, error } = await supabase.rpc('get_game_state', { p_game_id: id })
   if (error) throw new Error(error.message)
   const row = firstRow(data)
-  if (!row?.game_id) throw new Error(`讀取房間狀態失敗。${SCHEMA_HINT}`)
+  if (!row?.game_id) throw new Error(`讀取遊戲狀態失敗。${SCHEMA_HINT}`)
   return normalizeState(row)
 }
 
@@ -304,12 +304,12 @@ export async function hostAction(
   return normalizeState(firstRow(data))
 }
 
-/** 我目前主持中或參加中的房間（重新整理後可直接回到現場） */
+/** 我目前主持中或參加中的遊戲（重新整理後可直接回到現場） */
 export async function getMyActiveGame(): Promise<{ gameId: string; pin: string; isHost: boolean } | null> {
   const { data, error } = await supabase.rpc('get_my_active_game')
   if (error) throw new Error(error.message)
   const row = firstRow(data)
-  // 拿不到有效的房間編號就當作沒有進行中的遊戲，別讓首頁導到壞掉的網址
+  // 拿不到有效的遊戲編號就當作沒有進行中的遊戲，別讓首頁導到壞掉的網址
   if (!row?.game_id) return null
   try {
     return {

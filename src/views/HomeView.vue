@@ -17,7 +17,7 @@ const questionCount = ref(10)
 const error = ref('')
 const loading = ref(false)
 
-/** 進行中的房間（重新整理或不小心離開時可回到現場） */
+/** 進行中的遊戲（重新整理或不小心離開時可回到現場） */
 const active = ref<{ gameId: string; pin: string; isHost: boolean } | null>(null)
 
 async function checkActive() {
@@ -51,7 +51,7 @@ async function submit() {
   loading.value = true
   try {
     if (mode.value === 'join' && pin.value.trim().length < 4) {
-      throw new Error('請輸入主持人畫面上的 6 位數房間代碼')
+      throw new Error('請輸入主持人畫面上的 6 位數遊戲代碼')
     }
     await ensureLogin()
 
@@ -79,7 +79,7 @@ async function submit() {
         一起玩<br />即時問答派對
       </h1>
       <p class="max-w-md font-light leading-relaxed text-ink-600">
-        主持人開房間、大家用房間代碼加入，同一時間看同一題、一起搶答。
+        主持人建立遊戲、大家用遊戲代碼加入，同一時間看同一題、一起搶答。
         答得越快分數越高，每題結束立刻公布戰況，最後站上頒獎台的會是誰呢？
       </p>
       <ul class="space-y-3 text-sm font-light text-ink-600">
@@ -124,13 +124,13 @@ async function submit() {
           :class="mode === m ? 'is-active text-blossom-600' : 'text-ink-400 hover:text-blossom-500'"
           @click="mode = m"
         >
-          {{ m === 'join' ? '加入遊戲' : '我要開房間' }}
+          {{ m === 'join' ? '加入遊戲' : '我要建立遊戲' }}
         </button>
       </div>
 
       <form class="space-y-5" @submit.prevent="submit">
         <div v-if="mode === 'join'">
-          <label class="mb-2 block text-xs tracking-widest text-ink-400">房間代碼</label>
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">遊戲代碼</label>
           <input
             v-model="pin"
             inputmode="numeric"
@@ -175,7 +175,7 @@ async function submit() {
         <p v-if="error" class="text-sm text-blossom-600">{{ error }}</p>
 
         <button type="submit" :disabled="loading" class="btn btn-primary w-full">
-          {{ loading ? '處理中…' : mode === 'join' ? '加入房間' : '建立房間' }}
+          {{ loading ? '處理中…' : mode === 'join' ? '加入遊戲' : '建立遊戲' }}
         </button>
       </form>
     </div>

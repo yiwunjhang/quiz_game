@@ -69,7 +69,7 @@ async function copyPin() {
   </div>
 
   <div v-else-if="!state" class="card mx-auto max-w-md p-10 text-center">
-    <p class="text-blossom-600">{{ error || '找不到這個房間' }}</p>
+    <p class="text-blossom-600">{{ error || '找不到這場遊戲' }}</p>
     <button class="btn btn-ghost mt-6" @click="router.push({ name: 'home' })">回首頁</button>
   </div>
 
@@ -117,7 +117,7 @@ async function copyPin() {
         >
           開始遊戲
         </button>
-        <button class="btn btn-ghost" :disabled="busy" @click="endGame">解散房間</button>
+        <button class="btn btn-ghost" :disabled="busy" @click="endGame">結束遊戲</button>
       </div>
     </template>
 
