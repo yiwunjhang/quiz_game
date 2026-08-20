@@ -467,3 +467,36 @@ export async function deleteQuestion(id: number): Promise<void> {
   const { error } = await supabase.from('questions').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }
+
+/**
+ * 批次新增。匯入整份題庫時不必一題打一次 API。
+ * 任何一題格式不對就整批不寫入，避免匯到一半留下半套資料。
+ */
+export async function addQuestions(
+  items: { text: string; options: string[]; correct_index: number }[],
+): Promise<number> {
+  const rows = items.map((it, i) => {
+    try {
+      const clean = validateQuestion(it.text, it.options, it.correct_index)
+      return { text: it.text.trim(), options: clean, correct_index: it.correct_index }
+    } catch (e: any) {
+      throw new Error(`第 ${i + 1} 題：${e?.message ?? '格式不正確'}`)
+    }
+  })
+  if (rows.length === 0) return 0
+  const { error } = await supabase.from('questions').insert(rows)
+  if (error) throw new Error(error.message)
+  return rows.length
+}
+
+/**
+ * 清空整個題庫，回傳刪掉的題數。
+ *
+ * 注意：game_answers.question_id 有 on delete cascade，所以歷史對戰的
+ * 「逐題作答紀錄」會一併消失；玩家分數存在 game_players，排行榜不受影響。
+ */
+export async function deleteAllQuestions(): Promise<number> {
+  const { data, error } = await supabase.from('questions').delete().gt('id', 0).select('id')
+  if (error) throw new Error(error.message)
+  return data?.length ?? 0
+}
