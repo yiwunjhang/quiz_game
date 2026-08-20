@@ -22,11 +22,49 @@ export interface Question extends PublicQuestion {
   correct_index: number
 }
 
-export interface LeaderboardRow {
+/** 房間內的玩家（依分數排序） */
+export interface GamePlayer {
   user_id: string
   nickname: string
+  score: number
   correct_count: number
-  answered_count: number
+}
+
+/** 遊戲階段：等待中 / 作答中 / 公布答案 / 已結束 */
+export type GamePhase = 'lobby' | 'question' | 'reveal' | 'ended'
+
+/** 由 get_game_state 回傳的完整即時狀態 */
+export interface GameState {
+  game_id: string
+  pin: string
+  /** 資料庫實際狀態（主持人尚未按下一題時仍為 question） */
+  status: GamePhase
+  /** 實際顯示用階段：時間到即自動視為 reveal */
+  phase: GamePhase
+  is_host: boolean
+  index: number
+  total: number
+  seconds: number
+  started_at: string | null
+  server_now: string
+  question: PublicQuestion | null
+  correct_index: number | null
+  my_answer: { selected_index: number; is_correct: boolean; points: number } | null
+  my_score: number | null
+  player_count: number
+  answer_count: number
+  players: GamePlayer[]
+  /** 公布答案時，各選項被選的人數 */
+  stats: number[] | null
+}
+
+export interface GlobalRankRow {
+  user_id: string
+  nickname: string
+  total_score: number
+  games_played: number
+  best_score: number
+  correct_total: number
 }
 
 /* ------------------------------------------------------------------ */
@@ -140,57 +178,126 @@ export async function logout(): Promise<void> {
 }
 
 /* ------------------------------------------------------------------ */
-/* 玩家：題目 / 作答 / 分數                                              */
+/* 即時對戰                                                            */
 /* ------------------------------------------------------------------ */
 
-/** 取得測驗題目（不含答案，透過 server 端函式） */
-export async function getQuizQuestions(): Promise<PublicQuestion[]> {
-  const { data, error } = await supabase.rpc('get_quiz_questions')
-  if (error) throw new Error(error.message)
-  return (data ?? []).map((r: any) => ({
-    id: Number(r.id),
-    text: String(r.text),
-    options: Array.isArray(r.options) ? r.options : JSON.parse(r.options),
-  }))
-}
-
-/**
- * 提交作答，由 server 端評分並記錄（每題每人只計一次），
- * 回傳是否答對以及正確答案索引（供作答後標示，因已鎖定不能重answer 故安全）。
- */
-export async function submitAnswer(
-  questionId: number,
-  selectedIndex: number,
-): Promise<{ isCorrect: boolean; correctIndex: number }> {
-  const { data, error } = await supabase.rpc('submit_answer', {
-    p_question_id: questionId,
-    p_selected_index: selectedIndex,
-  })
-  if (error) throw new Error(error.message)
-  const row = Array.isArray(data) ? data[0] : data
+function normalizeState(raw: any): GameState {
+  const q = raw?.question
   return {
-    isCorrect: Boolean(row?.is_correct),
-    correctIndex: Number(row?.correct_index),
+    game_id: String(raw.game_id),
+    pin: String(raw.pin),
+    status: raw.status,
+    phase: raw.phase,
+    is_host: Boolean(raw.is_host),
+    index: Number(raw.index),
+    total: Number(raw.total),
+    seconds: Number(raw.seconds),
+    started_at: raw.started_at ?? null,
+    server_now: String(raw.server_now),
+    question: q
+      ? {
+          id: Number(q.id),
+          text: String(q.text),
+          options: Array.isArray(q.options) ? q.options : JSON.parse(q.options),
+        }
+      : null,
+    correct_index: raw.correct_index == null ? null : Number(raw.correct_index),
+    my_answer: raw.my_answer
+      ? {
+          selected_index: Number(raw.my_answer.selected_index),
+          is_correct: Boolean(raw.my_answer.is_correct),
+          points: Number(raw.my_answer.points),
+        }
+      : null,
+    my_score: raw.my_score == null ? null : Number(raw.my_score),
+    player_count: Number(raw.player_count ?? 0),
+    answer_count: Number(raw.answer_count ?? 0),
+    players: (raw.players ?? []).map((p: any) => ({
+      user_id: String(p.user_id),
+      nickname: String(p.nickname),
+      score: Number(p.score),
+      correct_count: Number(p.correct_count ?? 0),
+    })),
+    stats: Array.isArray(raw.stats) ? raw.stats.map((n: any) => Number(n)) : null,
   }
 }
 
-/** 取得自己的成績（答對的不重複題數 / 作答的不重複題數） */
-export async function getMyScore(): Promise<{ correct: number; total: number }> {
-  const { data, error } = await supabase.rpc('get_my_score')
+/** 建立房間，回傳房間 id 與 6 位數代碼 */
+export async function createGame(
+  seconds: number,
+  questionCount: number,
+): Promise<{ gameId: string; pin: string }> {
+  const { data, error } = await supabase.rpc('create_game', {
+    p_seconds: seconds,
+    p_count: questionCount,
+  })
   if (error) throw new Error(error.message)
-  const row = Array.isArray(data) ? data[0] : data
-  return { correct: Number(row?.correct ?? 0), total: Number(row?.total ?? 0) }
+  return { gameId: String(data.game_id), pin: String(data.pin) }
 }
 
-/** 排行榜（答對最多的不重複題數由高到低） */
-export async function getLeaderboard(): Promise<LeaderboardRow[]> {
-  const { data, error } = await supabase.rpc('get_leaderboard')
+/** 以房間代碼加入，回傳房間 id */
+export async function joinGame(pin: string): Promise<string> {
+  const { data, error } = await supabase.rpc('join_game', { p_pin: pin.trim() })
+  if (error) throw new Error(error.message)
+  return String(data)
+}
+
+/** 讀取房間即時狀態 */
+export async function getGameState(gameId: string): Promise<GameState> {
+  const { data, error } = await supabase.rpc('get_game_state', { p_game_id: gameId })
+  if (error) throw new Error(error.message)
+  return normalizeState(data)
+}
+
+/** 作答（伺服器計時計分，每題只計第一次） */
+export async function submitLiveAnswer(
+  gameId: string,
+  selectedIndex: number,
+): Promise<{ selected_index: number; is_correct: boolean; points: number }> {
+  const { data, error } = await supabase.rpc('submit_live_answer', {
+    p_game_id: gameId,
+    p_selected_index: selectedIndex,
+  })
+  if (error) throw new Error(error.message)
+  return {
+    selected_index: Number(data?.selected_index),
+    is_correct: Boolean(data?.is_correct),
+    points: Number(data?.points ?? 0),
+  }
+}
+
+/** 主持人操作：開始 / 提前公布答案 / 下一題 / 結束 */
+export async function hostAction(
+  gameId: string,
+  action: 'start' | 'reveal' | 'next' | 'end',
+): Promise<GameState> {
+  const { data, error } = await supabase.rpc('host_action', {
+    p_game_id: gameId,
+    p_action: action,
+  })
+  if (error) throw new Error(error.message)
+  return normalizeState(data)
+}
+
+/** 我目前主持中或參加中的房間（重新整理後可直接回到現場） */
+export async function getMyActiveGame(): Promise<{ gameId: string; pin: string; isHost: boolean } | null> {
+  const { data, error } = await supabase.rpc('get_my_active_game')
+  if (error) throw new Error(error.message)
+  if (!data) return null
+  return { gameId: String(data.game_id), pin: String(data.pin), isHost: Boolean(data.is_host) }
+}
+
+/** 總排行榜：累計所有已結束場次的得分 */
+export async function getGlobalLeaderboard(): Promise<GlobalRankRow[]> {
+  const { data, error } = await supabase.rpc('get_global_leaderboard')
   if (error) throw new Error(error.message)
   return (data ?? []).map((r: any) => ({
     user_id: String(r.user_id),
     nickname: String(r.nickname),
-    correct_count: Number(r.correct_count),
-    answered_count: Number(r.answered_count),
+    total_score: Number(r.total_score),
+    games_played: Number(r.games_played),
+    best_score: Number(r.best_score),
+    correct_total: Number(r.correct_total),
   }))
 }
 

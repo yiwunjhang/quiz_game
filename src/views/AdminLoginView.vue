@@ -28,40 +28,31 @@ async function submit() {
 </script>
 
 <template>
-  <div class="max-w-sm mx-auto">
-    <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-xl">
-      <h1 class="text-xl font-bold mb-1">⚙️ 後台登入</h1>
-      <p class="text-sm text-slate-400 mb-4">以具備管理權限的帳號登入以管理題庫</p>
+  <div class="mx-auto max-w-sm">
+    <div class="glass glass-strong p-7">
+      <h1 class="text-xl font-black text-plum-800">⚙️ 後台登入</h1>
+      <p class="mb-5 mt-1 text-sm text-plum-500">以具備管理權限的帳號登入以管理題庫</p>
+
       <form class="space-y-4" @submit.prevent="submit">
         <div>
-          <label class="block text-sm mb-1 text-slate-300">管理者暱稱</label>
-          <input
-            v-model="nickname"
-            type="text"
-            placeholder="管理帳號暱稱"
-            class="w-full rounded-lg bg-slate-800/80 border border-white/10 px-3 py-2 outline-none focus:border-indigo-400"
-          />
+          <label class="mb-1 block text-sm font-semibold text-plum-600">管理者暱稱</label>
+          <input v-model="nickname" type="text" placeholder="管理帳號暱稱" class="field" />
         </div>
         <div>
-          <label class="block text-sm mb-1 text-slate-300">密碼</label>
-          <input
-            v-model="password"
-            type="password"
-            placeholder="密碼"
-            class="w-full rounded-lg bg-slate-800/80 border border-white/10 px-3 py-2 outline-none focus:border-indigo-400"
-          />
+          <label class="mb-1 block text-sm font-semibold text-plum-600">密碼</label>
+          <input v-model="password" type="password" placeholder="密碼" class="field" />
         </div>
-        <p v-if="error" class="text-sm text-rose-400">{{ error }}</p>
-        <button
-          type="submit"
-          :disabled="loading"
-          class="w-full rounded-lg bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 font-semibold py-2.5 transition"
-        >
+
+        <p v-if="error" class="text-sm font-semibold text-blush-600">{{ error }}</p>
+
+        <button type="submit" :disabled="loading" class="btn btn-primary w-full">
           {{ loading ? '登入中…' : '登入' }}
         </button>
       </form>
-      <p class="text-xs text-slate-500 mt-4">
-        管理權限需在 Supabase 將該帳號 <code class="text-slate-300">profiles.is_admin</code>
+
+      <p class="mt-5 text-xs text-plum-400">
+        管理權限需在 Supabase 將該帳號
+        <code class="rounded bg-white/60 px-1 text-plum-600">profiles.is_admin</code>
         設為 true，詳見 README。
       </p>
     </div>

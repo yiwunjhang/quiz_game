@@ -152,43 +152,35 @@ async function importJson(e: Event) {
 <template>
   <div class="space-y-8">
     <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-extrabold">⚙️ 題庫管理</h1>
-      <button
-        class="text-sm rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5 transition"
-        @click="logout"
-      >
-        登出後台
-      </button>
+      <h1 class="text-2xl font-black text-plum-800">⚙️ 題庫管理</h1>
+      <button class="btn btn-ghost btn-sm" @click="logout">登出後台</button>
     </div>
 
     <!-- 表單 -->
-    <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-xl">
-      <h2 class="text-lg font-bold mb-4">
+    <div class="glass glass-strong p-6">
+      <h2 class="mb-4 text-lg font-extrabold text-plum-700">
         {{ editingId != null ? '編輯題目' : '新增題目' }}
       </h2>
 
       <div class="space-y-4">
         <div>
-          <label class="block text-sm mb-1 text-slate-300">題目內容</label>
-          <textarea
-            v-model="text"
-            rows="2"
-            placeholder="輸入題目…"
-            class="w-full rounded-lg bg-slate-800/80 border border-white/10 px-3 py-2 outline-none focus:border-indigo-400"
-          ></textarea>
+          <label class="mb-1 block text-sm font-semibold text-plum-600">題目內容</label>
+          <textarea v-model="text" rows="2" placeholder="輸入題目…" class="field"></textarea>
         </div>
 
         <div>
-          <label class="block text-sm mb-2 text-slate-300">選項（點選左側圓圈標記正確答案）</label>
+          <label class="mb-2 block text-sm font-semibold text-plum-600">
+            選項（點選左側標記正確答案）
+          </label>
           <div class="space-y-2">
             <div v-for="(_, i) in options" :key="i" class="flex items-center gap-2">
               <button
                 type="button"
-                class="flex-none w-8 h-8 rounded-full border-2 grid place-items-center text-xs font-bold transition"
+                class="grid h-9 w-9 flex-none place-items-center rounded-full border-2 text-xs font-bold transition"
                 :class="
                   correctIndex === i
-                    ? 'border-emerald-400 bg-emerald-500/30 text-emerald-300'
-                    : 'border-white/20 text-slate-400 hover:border-white/40'
+                    ? 'border-mint-400 bg-mint-200 text-mint-500'
+                    : 'border-white/70 bg-white/40 text-plum-400 hover:border-blush-300'
                 "
                 title="設為正確答案"
                 @click="correctIndex = i"
@@ -199,11 +191,11 @@ async function importJson(e: Event) {
                 v-model="options[i]"
                 type="text"
                 :placeholder="'選項 ' + String.fromCharCode(65 + i)"
-                class="flex-1 rounded-lg bg-slate-800/80 border border-white/10 px-3 py-2 outline-none focus:border-indigo-400"
+                class="field flex-1"
               />
               <button
                 type="button"
-                class="flex-none w-8 h-8 rounded-lg bg-white/5 hover:bg-rose-500/30 text-slate-400 transition disabled:opacity-30"
+                class="h-9 w-9 flex-none rounded-full bg-white/50 text-plum-400 transition hover:bg-blush-200 disabled:opacity-30"
                 :disabled="options.length <= 2"
                 @click="removeOption(i)"
               >
@@ -214,29 +206,21 @@ async function importJson(e: Event) {
           <button
             v-if="options.length < 6"
             type="button"
-            class="mt-2 text-sm text-indigo-300 hover:text-indigo-200"
+            class="mt-2 text-sm font-semibold text-lilac-500 hover:text-lilac-400"
             @click="addOption"
           >
             + 新增選項
           </button>
         </div>
 
-        <p v-if="error" class="text-sm text-rose-400">{{ error }}</p>
-        <p v-if="message" class="text-sm text-emerald-400">{{ message }}</p>
+        <p v-if="error" class="text-sm font-semibold text-blush-600">{{ error }}</p>
+        <p v-if="message" class="text-sm font-semibold text-mint-500">{{ message }}</p>
 
         <div class="flex gap-2">
-          <button
-            :disabled="busy"
-            class="rounded-lg bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 font-semibold px-5 py-2 transition"
-            @click="save"
-          >
+          <button :disabled="busy" class="btn btn-primary" @click="save">
             {{ editingId != null ? '更新題目' : '新增題目' }}
           </button>
-          <button
-            v-if="editingId != null"
-            class="rounded-lg bg-white/10 hover:bg-white/20 px-5 py-2 transition"
-            @click="resetForm"
-          >
+          <button v-if="editingId != null" class="btn btn-ghost" @click="resetForm">
             取消編輯
           </button>
         </div>
@@ -244,14 +228,9 @@ async function importJson(e: Event) {
     </div>
 
     <!-- 匯出 / 匯入 -->
-    <div class="flex flex-wrap items-center gap-3 text-sm">
-      <button
-        class="rounded-lg bg-white/10 hover:bg-white/20 px-4 py-2 transition"
-        @click="exportJson"
-      >
-        ⬇️ 匯出題庫 JSON
-      </button>
-      <label class="rounded-lg bg-white/10 hover:bg-white/20 px-4 py-2 transition cursor-pointer">
+    <div class="flex flex-wrap items-center gap-3">
+      <button class="btn btn-ghost btn-sm" @click="exportJson">⬇️ 匯出題庫 JSON</button>
+      <label class="btn btn-ghost btn-sm cursor-pointer">
         ⬆️ 匯入題庫 JSON
         <input
           ref="fileInput"
@@ -265,40 +244,31 @@ async function importJson(e: Event) {
 
     <!-- 題目列表 -->
     <div>
-      <h2 class="text-lg font-bold mb-3">目前題庫（{{ questions.length }} 題）</h2>
-      <div v-if="questions.length === 0" class="text-slate-400 text-sm">尚無題目。</div>
+      <h2 class="mb-3 text-lg font-extrabold text-plum-700">
+        目前題庫（{{ questions.length }} 題）
+      </h2>
+      <div v-if="questions.length === 0" class="glass p-8 text-center text-sm text-plum-400">
+        尚無題目。
+      </div>
       <ol v-else class="space-y-3">
-        <li
-          v-for="(q, qi) in questions"
-          :key="q.id"
-          class="bg-white/5 border border-white/10 rounded-xl p-4"
-        >
+        <li v-for="(q, qi) in questions" :key="q.id" class="glass p-5">
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1">
-              <p class="font-semibold">{{ qi + 1 }}. {{ q.text }}</p>
+              <p class="font-extrabold text-plum-700">{{ qi + 1 }}. {{ q.text }}</p>
               <ul class="mt-2 space-y-1 text-sm">
                 <li
                   v-for="(opt, oi) in q.options"
                   :key="oi"
-                  :class="oi === q.correct_index ? 'text-emerald-400 font-medium' : 'text-slate-400'"
+                  :class="oi === q.correct_index ? 'font-bold text-mint-500' : 'text-plum-400'"
                 >
                   {{ String.fromCharCode(65 + oi) }}. {{ opt }}
                   <span v-if="oi === q.correct_index">✓</span>
                 </li>
               </ul>
             </div>
-            <div class="flex flex-col gap-2 flex-none">
-              <button
-                class="text-sm rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5 transition"
-                @click="edit(q)"
-              >
-                編輯
-              </button>
-              <button
-                :disabled="busy"
-                class="text-sm rounded-lg bg-rose-500/70 hover:bg-rose-500 disabled:opacity-50 px-3 py-1.5 transition"
-                @click="remove(q)"
-              >
+            <div class="flex flex-none flex-col gap-2">
+              <button class="btn btn-ghost btn-sm" @click="edit(q)">編輯</button>
+              <button :disabled="busy" class="btn btn-danger btn-sm" @click="remove(q)">
                 刪除
               </button>
             </div>
