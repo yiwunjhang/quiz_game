@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getLeaderboard, type LeaderboardRow } from '../db/database'
+import { getLeaderboard, type LeaderboardRow } from '../db/api'
 import { useSessionStore } from '../stores/session'
 
 const session = useSessionStore()
 const rows = ref<LeaderboardRow[]>([])
+const loading = ref(true)
+const error = ref('')
 
-onMounted(() => {
-  rows.value = getLeaderboard()
+onMounted(async () => {
+  try {
+    rows.value = await getLeaderboard()
+  } catch (e: any) {
+    error.value = e?.message ?? '載入失敗'
+  } finally {
+    loading.value = false
+  }
 })
 
 function medal(i: number): string {
@@ -19,7 +27,9 @@ function medal(i: number): string {
   <div class="max-w-2xl mx-auto">
     <h1 class="text-2xl font-extrabold mb-6 flex items-center gap-2">🏆 排行榜</h1>
 
-    <div v-if="rows.length === 0" class="text-center py-16 text-slate-400">
+    <div v-if="loading" class="text-center py-16 text-slate-400">載入中…</div>
+    <div v-else-if="error" class="text-center py-16 text-rose-400">{{ error }}</div>
+    <div v-else-if="rows.length === 0" class="text-center py-16 text-slate-400">
       還沒有人完成挑戰，快去當第一名吧！
     </div>
 

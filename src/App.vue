@@ -5,8 +5,8 @@ import { useSessionStore } from './stores/session'
 const session = useSessionStore()
 const router = useRouter()
 
-function logout() {
-  session.logout()
+async function logout() {
+  await session.logout()
   router.push({ name: 'home' })
 }
 </script>

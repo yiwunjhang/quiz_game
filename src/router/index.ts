@@ -46,6 +46,10 @@ router.beforeEach((to) => {
   if (to.meta.requiresAdmin && !session.isAdmin) {
     return { name: 'admin-login' }
   }
+  // 已登入且具管理權限者，造訪後台登入頁時直接進題庫管理
+  if (to.name === 'admin-login' && session.isAdmin) {
+    return { name: 'admin-questions' }
+  }
   return true
 })
 

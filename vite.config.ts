@@ -8,6 +8,4 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: './',
   plugins: [vue(), tailwindcss()],
-  // sql.js 需要載入 .wasm，Vite 需要允許此格式為 asset
-  assetsInclude: ['**/*.wasm'],
 })

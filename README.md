@@ -1,60 +1,91 @@
 # 🧠 問答遊戲挑戰 (Quiz Game)
 
-純前端問答遊戲系統，使用 **Vue 3 + Vite + TypeScript + Tailwind CSS**，
-資料儲存在瀏覽器內的 **SQLite（sql.js / WASM）**，可直接部署到 **GitHub Pages**。
+多人問答遊戲系統，使用 **Vue 3 + Vite + TypeScript + Tailwind CSS**，
+後端資料以 **Supabase（雲端 Postgres + Auth）** 儲存，前端部署到 **GitHub Pages**。
+**多台裝置共用同一份題庫與排行榜。**
 
 ## 功能
 
-- 🎮 參加者以「暱稱 + 密碼」加入遊戲（首次登入即註冊）
-- ❓ 逐題作答，即時顯示對錯與進度
-- 🏆 排行榜：依「答對不重複題數」排名
-- ⚙️ 後台管理：新增／編輯／刪除題目、匯出／匯入題庫 JSON
-- 💾 資料以 SQLite 格式持久化在 `localStorage`
+- 🎮 參加者以「暱稱 + 密碼」加入（首次登入即註冊，支援中文暱稱）
+- ❓ 逐題作答；**答案由伺服器評分**，前端拿不到正確答案，無法作弊
+- 🔒 每人每題只計一次，分數無法灌水
+- 🏆 排行榜：依「答對不重複題數」排名（公開頁面，免登入可看）
+- ⚙️ 後台管理：新增／編輯／刪除題目、匯出／匯入題庫 JSON（需管理權限）
 
-## ⚠️ 重要限制
+## 架構
 
-這是**純前端**應用，資料存在「使用者當下的瀏覽器」中，**不會跨裝置或跨瀏覽器同步**。
+| 層     | 技術                                    |
+| ------ | --------------------------------------- |
+| UI     | Vue 3 `<script setup>` + Tailwind CSS v4 |
+| 路由   | vue-router（hash 模式）                 |
+| 狀態   | Pinia                                   |
+| 後端   | Supabase（Postgres + Auth + RPC）       |
+| 部署   | GitHub Actions → GitHub Pages           |
 
-適用情境：
+安全設計：玩家的所有讀寫（取題、作答、排行榜）都經過 Supabase 的
+`security definer` 函式與 Row Level Security，確保答案不外洩、分數不可偽造。
+題庫管理則限定 `is_admin = true` 的帳號。
 
-- 活動現場用**同一台裝置/大螢幕**，參加者輪流登入作答
-- 或每位參加者各自在自己的瀏覽器獨立遊玩
+---
 
-若需要「多人各自裝置、共用同一份題庫與排行榜」，必須改為搭配後端 API 或雲端資料庫
-（例如 .NET8 + Azure SQL、或 Supabase 等 BaaS）。資料層集中在 `src/db/database.ts`，方便日後替換。
+## 一、建立 Supabase 專案（免費）
 
-## 開發
+1. 到 <https://supabase.com> 註冊並登入。
+2. 點 **New project**，填專案名稱、資料庫密碼、選離你最近的區域，建立（約需 1～2 分鐘）。
+3. 建好後到 **Settings → API**，記下兩個值：
+   - **Project URL**（形如 `https://xxxx.supabase.co`）
+   - **anon public** key
+4. **關閉 Email 驗證**（本專案用暱稱登入，不需收信）：
+   到 **Authentication → Sign In / Providers → Email**，
+   將 **Confirm email** 關閉並儲存。
+5. 到 **SQL Editor → New query**，貼上專案中 `supabase/schema.sql` 全部內容並 **Run**。
+   這會建立資料表、權限規則、伺服器函式，並塞入幾題範例題目。
+
+## 二、本機開發
 
 ```bash
 npm install
-npm run dev      # 本機開發 http://localhost:5173
-npm run build    # 產出 dist/
-npm run preview  # 預覽建置結果
+cp .env.example .env.local   # 然後填入上面的 URL 與 anon key
+npm run dev                  # http://localhost:5173
 ```
 
-## 後台
+`.env.local` 內容：
 
-- 網址：`/#/admin`
-- 預設管理密碼：`admin123`
-- **正式使用請務必修改** `src/stores/session.ts` 中的 `ADMIN_PASSWORD`
+```
+VITE_SUPABASE_URL=https://xxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=你的-anon-public-key
+```
 
-## 部署到 GitHub Pages
+## 三、設定管理者帳號
+
+1. 開啟遊戲首頁，用一個暱稱（例如 `admin`）+ 密碼註冊登入一次。
+2. 回到 Supabase **SQL Editor**，執行：
+   ```sql
+   update public.profiles set is_admin = true where nickname = 'admin';
+   ```
+3. 之後到 `/#/admin`，用該暱稱與密碼登入即可管理題庫。
+
+## 四、部署到 GitHub Pages
 
 1. 建立 GitHub repo 並推送本專案。
-2. 到 repo 的 **Settings → Pages → Build and deployment**，Source 選擇 **GitHub Actions**。
-3. 推送到 `main` 分支後，`.github/workflows/deploy.yml` 會自動建置並部署。
-4. 完成後即可在 `https://<你的帳號>.github.io/<repo 名稱>/` 開啟。
+2. repo → **Settings → Secrets and variables → Actions → Variables**，
+   新增兩個 **Repository variable**：
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
 
-> 專案使用 `base: './'` 搭配 router 的 hash 模式，因此在任何子路徑下都能正常運作，
-> 重新整理頁面也不會 404。
+   > anon key 本來就是公開金鑰（受 RLS 保護），用 Variables 或 Secrets 皆可。
+3. repo → **Settings → Pages → Build and deployment**，Source 選 **GitHub Actions**。
+4. 推送到 `main` 後，`.github/workflows/deploy.yml` 會自動建置並部署到
+   `https://<你的帳號>.github.io/<repo 名稱>/`。
 
-## 技術架構
+> 使用 `base: './'` 搭配 router hash 模式，任何子路徑皆可運作，重新整理不會 404。
 
-| 層          | 技術                             |
-| ----------- | -------------------------------- |
-| UI          | Vue 3 `<script setup>` + Tailwind CSS v4 |
-| 路由        | vue-router（hash 模式）          |
-| 狀態        | Pinia                            |
-| 資料庫      | sql.js（瀏覽器內 SQLite）        |
-| 持久化      | localStorage（序列化 DB）        |
-| 部署        | GitHub Actions → GitHub Pages    |
+---
+
+## 常見問題
+
+- **註冊時出現「未取得登入狀態」** → 請確認步驟一第 4 點已關閉 Email 驗證。
+- **首頁顯示「尚未設定 Supabase 連線資訊」** → `.env.local`（本機）或 repo Variables（部署）未設定。
+- **密碼太短被拒** → Supabase 預設密碼至少 6 碼。
+- **暱稱含特殊符號登入失敗** → 內部會把暱稱編碼成合法 email；若整個網域被拒，
+  可修改 `src/db/api.ts` 中的 `EMAIL_DOMAIN` 常數。

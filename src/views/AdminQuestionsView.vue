@@ -2,12 +2,12 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  getQuestions,
+  getQuestionsAdmin,
   addQuestion,
   updateQuestion,
   deleteQuestion,
   type Question,
-} from '../db/database'
+} from '../db/api'
 import { useSessionStore } from '../stores/session'
 
 const router = useRouter()
@@ -20,9 +20,14 @@ const options = ref<string[]>(['', '', '', ''])
 const correctIndex = ref(0)
 const error = ref('')
 const message = ref('')
+const busy = ref(false)
 
-function refresh() {
-  questions.value = getQuestions()
+async function refresh() {
+  try {
+    questions.value = await getQuestionsAdmin()
+  } catch (e: any) {
+    error.value = e?.message ?? '載入題庫失敗'
+  }
 }
 
 onMounted(refresh)
@@ -45,22 +50,25 @@ function removeOption(i: number) {
   if (correctIndex.value >= options.value.length) correctIndex.value = 0
 }
 
-function save() {
+async function save() {
   error.value = ''
   message.value = ''
+  busy.value = true
   try {
     const opts = options.value.map((o) => o.trim())
     if (editingId.value != null) {
-      updateQuestion(editingId.value, text.value, opts, correctIndex.value)
+      await updateQuestion(editingId.value, text.value, opts, correctIndex.value)
       message.value = '題目已更新'
     } else {
-      addQuestion(text.value, opts, correctIndex.value)
+      await addQuestion(text.value, opts, correctIndex.value)
       message.value = '題目已新增'
     }
     resetForm()
-    refresh()
+    await refresh()
   } catch (e: any) {
     error.value = e?.message ?? '儲存失敗'
+  } finally {
+    busy.value = false
   }
 }
 
@@ -73,22 +81,33 @@ function edit(q: Question) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function remove(q: Question) {
+async function remove(q: Question) {
   if (!confirm(`確定要刪除題目「${q.text}」嗎？`)) return
-  deleteQuestion(q.id)
-  if (editingId.value === q.id) resetForm()
-  refresh()
+  busy.value = true
+  try {
+    await deleteQuestion(q.id)
+    if (editingId.value === q.id) resetForm()
+    await refresh()
+  } catch (e: any) {
+    error.value = e?.message ?? '刪除失敗'
+  } finally {
+    busy.value = false
+  }
 }
 
-function logout() {
-  session.logoutAdmin()
+async function logout() {
+  await session.logout()
   router.push({ name: 'home' })
 }
 
-/* ---- 匯出 / 匯入 (方便在不同瀏覽器間搬移題庫) ---- */
+/* ---- 匯出 / 匯入 ---- */
 function exportJson() {
   const data = JSON.stringify(
-    questions.value.map((q) => ({ text: q.text, options: q.options, correct_index: q.correct_index })),
+    questions.value.map((q) => ({
+      text: q.text,
+      options: q.options,
+      correct_index: q.correct_index,
+    })),
     null,
     2,
   )
@@ -103,29 +122,30 @@ function exportJson() {
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
-function importJson(e: Event) {
+async function importJson(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    try {
-      const arr = JSON.parse(String(reader.result))
-      if (!Array.isArray(arr)) throw new Error('格式不正確')
-      let ok = 0
-      for (const item of arr) {
-        if (item?.text && Array.isArray(item.options)) {
-          addQuestion(item.text, item.options, Number(item.correct_index) || 0)
-          ok++
-        }
+  error.value = ''
+  message.value = ''
+  busy.value = true
+  try {
+    const arr = JSON.parse(await file.text())
+    if (!Array.isArray(arr)) throw new Error('格式不正確')
+    let ok = 0
+    for (const item of arr) {
+      if (item?.text && Array.isArray(item.options)) {
+        await addQuestion(item.text, item.options, Number(item.correct_index) || 0)
+        ok++
       }
-      message.value = `已匯入 ${ok} 題`
-      refresh()
-    } catch (err: any) {
-      error.value = '匯入失敗：' + (err?.message ?? '未知錯誤')
     }
+    message.value = `已匯入 ${ok} 題`
+    await refresh()
+  } catch (err: any) {
+    error.value = '匯入失敗：' + (err?.message ?? '未知錯誤')
+  } finally {
+    busy.value = false
+    if (fileInput.value) fileInput.value.value = ''
   }
-  reader.readAsText(file)
-  if (fileInput.value) fileInput.value.value = ''
 }
 </script>
 
@@ -170,7 +190,7 @@ function importJson(e: Event) {
                     ? 'border-emerald-400 bg-emerald-500/30 text-emerald-300'
                     : 'border-white/20 text-slate-400 hover:border-white/40'
                 "
-                :title="'設為正確答案'"
+                title="設為正確答案"
                 @click="correctIndex = i"
               >
                 {{ String.fromCharCode(65 + i) }}
@@ -206,7 +226,8 @@ function importJson(e: Event) {
 
         <div class="flex gap-2">
           <button
-            class="rounded-lg bg-indigo-500 hover:bg-indigo-400 font-semibold px-5 py-2 transition"
+            :disabled="busy"
+            class="rounded-lg bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 font-semibold px-5 py-2 transition"
             @click="save"
           >
             {{ editingId != null ? '更新題目' : '新增題目' }}
@@ -232,7 +253,13 @@ function importJson(e: Event) {
       </button>
       <label class="rounded-lg bg-white/10 hover:bg-white/20 px-4 py-2 transition cursor-pointer">
         ⬆️ 匯入題庫 JSON
-        <input ref="fileInput" type="file" accept="application/json" class="hidden" @change="importJson" />
+        <input
+          ref="fileInput"
+          type="file"
+          accept="application/json"
+          class="hidden"
+          @change="importJson"
+        />
       </label>
     </div>
 
@@ -268,7 +295,8 @@ function importJson(e: Event) {
                 編輯
               </button>
               <button
-                class="text-sm rounded-lg bg-rose-500/70 hover:bg-rose-500 px-3 py-1.5 transition"
+                :disabled="busy"
+                class="text-sm rounded-lg bg-rose-500/70 hover:bg-rose-500 disabled:opacity-50 px-3 py-1.5 transition"
                 @click="remove(q)"
               >
                 刪除
