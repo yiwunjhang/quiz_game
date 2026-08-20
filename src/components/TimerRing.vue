@@ -20,27 +20,16 @@ const urgent = computed(() => props.seconds <= 5)
 </script>
 
 <template>
-  <div
-    class="relative flex-none"
-    :style="{ width: size + 'px', height: size + 'px' }"
-    :class="urgent ? 'animate-soft-pulse' : ''"
-  >
-    <svg class="timer-ring w-full h-full" viewBox="0 0 100 100">
-      <circle
-        cx="50"
-        cy="50"
-        :r="RADIUS"
-        fill="rgba(255,255,255,0.45)"
-        stroke="rgba(255,255,255,0.85)"
-        stroke-width="9"
-      />
+  <div class="relative flex-none" :style="{ width: size + 'px', height: size + 'px' }">
+    <svg class="timer-ring h-full w-full" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" :r="RADIUS" fill="#fff" stroke="#ffe8e6" stroke-width="4" />
       <circle
         cx="50"
         cy="50"
         :r="RADIUS"
         fill="none"
-        :stroke="urgent ? '#fa6ea6' : '#b391ff'"
-        stroke-width="9"
+        :stroke="urgent ? '#c96060' : '#ed9191'"
+        stroke-width="4"
         stroke-linecap="round"
         :stroke-dasharray="CIRC"
         :stroke-dashoffset="offset"
@@ -48,9 +37,9 @@ const urgent = computed(() => props.seconds <= 5)
     </svg>
     <div class="absolute inset-0 grid place-items-center">
       <span
-        class="font-extrabold tabular-nums"
-        :class="urgent ? 'text-blush-600' : 'text-plum-700'"
-        :style="{ fontSize: size * 0.34 + 'px' }"
+        class="font-serif tabular-nums"
+        :class="[urgent ? 'text-blossom-600 animate-soft-pulse' : 'text-blossom-500']"
+        :style="{ fontSize: size * 0.36 + 'px' }"
       >
         {{ Math.max(0, seconds) }}
       </span>

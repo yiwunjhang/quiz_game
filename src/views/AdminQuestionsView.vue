@@ -151,36 +151,39 @@ async function importJson(e: Event) {
 
 <template>
   <div class="space-y-8">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-black text-plum-800">⚙️ 題庫管理</h1>
+    <div class="flex items-center justify-between border-b border-blossom-200 pb-4">
+      <div>
+        <p class="section-subtitle text-left">ADMIN</p>
+        <h1 class="font-serif text-2xl text-blossom-600">題庫管理</h1>
+      </div>
       <button class="btn btn-ghost btn-sm" @click="logout">登出後台</button>
     </div>
 
     <!-- 表單 -->
-    <div class="glass glass-strong p-6">
-      <h2 class="mb-4 text-lg font-extrabold text-plum-700">
+    <div class="card p-7">
+      <h2 class="mb-5 font-serif text-lg text-blossom-600">
         {{ editingId != null ? '編輯題目' : '新增題目' }}
       </h2>
 
-      <div class="space-y-4">
+      <div class="space-y-5">
         <div>
-          <label class="mb-1 block text-sm font-semibold text-plum-600">題目內容</label>
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">題目內容</label>
           <textarea v-model="text" rows="2" placeholder="輸入題目…" class="field"></textarea>
         </div>
 
         <div>
-          <label class="mb-2 block text-sm font-semibold text-plum-600">
+          <label class="mb-3 block text-xs tracking-widest text-ink-400">
             選項（點選左側標記正確答案）
           </label>
           <div class="space-y-2">
             <div v-for="(_, i) in options" :key="i" class="flex items-center gap-2">
               <button
                 type="button"
-                class="grid h-9 w-9 flex-none place-items-center rounded-full border-2 text-xs font-bold transition"
+                class="grid h-9 w-9 flex-none place-items-center rounded-full border text-xs font-medium transition-all duration-300"
                 :class="
                   correctIndex === i
-                    ? 'border-mint-400 bg-mint-200 text-mint-500'
-                    : 'border-white/70 bg-white/40 text-plum-400 hover:border-blush-300'
+                    ? 'border-sage-500 bg-sage-100 text-sage-600'
+                    : 'border-blossom-300 bg-white text-ink-400 hover:border-blossom-500'
                 "
                 title="設為正確答案"
                 @click="correctIndex = i"
@@ -195,7 +198,7 @@ async function importJson(e: Event) {
               />
               <button
                 type="button"
-                class="h-9 w-9 flex-none rounded-full bg-white/50 text-plum-400 transition hover:bg-blush-200 disabled:opacity-30"
+                class="h-9 w-9 flex-none rounded-full border border-blossom-200 bg-white text-ink-400 transition-all duration-300 hover:border-blossom-500 hover:text-blossom-600 disabled:opacity-30"
                 :disabled="options.length <= 2"
                 @click="removeOption(i)"
               >
@@ -206,15 +209,15 @@ async function importJson(e: Event) {
           <button
             v-if="options.length < 6"
             type="button"
-            class="mt-2 text-sm font-semibold text-lilac-500 hover:text-lilac-400"
+            class="mt-3 text-sm text-blossom-500 transition-colors duration-300 hover:text-blossom-600"
             @click="addOption"
           >
             + 新增選項
           </button>
         </div>
 
-        <p v-if="error" class="text-sm font-semibold text-blush-600">{{ error }}</p>
-        <p v-if="message" class="text-sm font-semibold text-mint-500">{{ message }}</p>
+        <p v-if="error" class="text-sm text-blossom-600">{{ error }}</p>
+        <p v-if="message" class="text-sm text-sage-600">{{ message }}</p>
 
         <div class="flex gap-2">
           <button :disabled="busy" class="btn btn-primary" @click="save">
@@ -229,9 +232,9 @@ async function importJson(e: Event) {
 
     <!-- 匯出 / 匯入 -->
     <div class="flex flex-wrap items-center gap-3">
-      <button class="btn btn-ghost btn-sm" @click="exportJson">⬇️ 匯出題庫 JSON</button>
+      <button class="btn btn-ghost btn-sm" @click="exportJson">匯出題庫 JSON</button>
       <label class="btn btn-ghost btn-sm cursor-pointer">
-        ⬆️ 匯入題庫 JSON
+        匯入題庫 JSON
         <input
           ref="fileInput"
           type="file"
@@ -244,25 +247,32 @@ async function importJson(e: Event) {
 
     <!-- 題目列表 -->
     <div>
-      <h2 class="mb-3 text-lg font-extrabold text-plum-700">
+      <h2 class="mb-4 font-serif text-lg text-blossom-600">
         目前題庫（{{ questions.length }} 題）
       </h2>
-      <div v-if="questions.length === 0" class="glass p-8 text-center text-sm text-plum-400">
-        尚無題目。
+      <div
+        v-if="questions.length === 0"
+        class="card p-10 text-center text-sm font-light text-ink-400"
+      >
+        尚無題目
       </div>
       <ol v-else class="space-y-3">
-        <li v-for="(q, qi) in questions" :key="q.id" class="glass p-5">
-          <div class="flex items-start justify-between gap-4">
+        <li v-for="(q, qi) in questions" :key="q.id" class="card card-hover p-6">
+          <div class="flex items-start justify-between gap-5">
             <div class="flex-1">
-              <p class="font-extrabold text-plum-700">{{ qi + 1 }}. {{ q.text }}</p>
-              <ul class="mt-2 space-y-1 text-sm">
+              <p class="font-medium text-ink-900">
+                <span class="font-serif text-blossom-500">{{ qi + 1 }}.</span> {{ q.text }}
+              </p>
+              <ul class="mt-3 space-y-1 text-sm font-light">
                 <li
                   v-for="(opt, oi) in q.options"
                   :key="oi"
-                  :class="oi === q.correct_index ? 'font-bold text-mint-500' : 'text-plum-400'"
+                  :class="oi === q.correct_index ? 'text-sage-600' : 'text-ink-400'"
                 >
                   {{ String.fromCharCode(65 + oi) }}. {{ opt }}
-                  <span v-if="oi === q.correct_index">✓</span>
+                  <span v-if="oi === q.correct_index" class="ml-1 text-xs tracking-widest">
+                    正解
+                  </span>
                 </li>
               </ul>
             </div>

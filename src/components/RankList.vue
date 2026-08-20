@@ -21,33 +21,30 @@ const shown = computed(() => {
   if (me && !top.some((p) => p.user_id === me.user_id)) return [...top, me]
   return top
 })
-
-function medal(rank: number): string {
-  return ['🥇', '🥈', '🥉'][rank - 1] ?? String(rank)
-}
 </script>
 
 <template>
-  <ul class="space-y-2">
+  <ul class="divide-y divide-blossom-200">
     <li
       v-for="p in shown"
       :key="p.user_id"
-      class="glass-soft flex items-center gap-3 px-4 py-2.5 animate-pop"
-      :class="[
-        p.rank <= 3 ? 'ring-1 ring-blush-300/70' : '',
-        p.user_id === meId ? 'ring-2 ring-lilac-400/80' : '',
-      ]"
+      class="animate-fade-up flex items-center gap-4 py-3"
+      :class="p.user_id === meId ? 'text-blossom-600' : 'text-ink-800'"
     >
-      <span class="w-8 flex-none text-center text-lg font-extrabold text-plum-500">
-        {{ medal(p.rank) }}
+      <span
+        class="w-7 flex-none text-center font-serif text-lg"
+        :class="p.rank <= 3 ? 'text-blossom-500' : 'text-ink-400'"
+      >
+        {{ p.rank }}
       </span>
-      <span class="flex-1 truncate font-bold text-plum-700">
+      <span class="flex-1 truncate font-medium">
         {{ p.nickname }}
-        <span v-if="p.user_id === meId" class="ml-1 text-xs text-lilac-500">(你)</span>
+        <span v-if="p.user_id === meId" class="ml-1 text-xs tracking-widest text-blossom-500">
+          YOU
+        </span>
       </span>
-      <span class="flex-none text-right">
-        <span class="block text-lg font-extrabold tabular-nums text-blush-600">{{ p.score }}</span>
-        <span class="block text-[11px] text-plum-400">分</span>
+      <span class="flex-none font-serif text-lg tabular-nums text-blossom-600">
+        {{ p.score }}
       </span>
     </li>
   </ul>

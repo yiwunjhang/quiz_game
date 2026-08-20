@@ -152,6 +152,17 @@ end $$;
 -- 玩家所有讀寫都經過這裡，因此答案不會提前外洩、分數也無法偽造。
 -- =====================================================================
 
+-- 先移除舊版本。`create or replace function` 無法改變回傳型別，
+-- 開發過程若調整過簽章，不先 drop 就會整份腳本失敗。
+-- （is_game_member 被 policy 依賴、且簽章未變，所以不在此列，直接 replace 即可。）
+drop function if exists public.create_game(int, int);
+drop function if exists public.join_game(text);
+drop function if exists public.get_game_state(uuid);
+drop function if exists public.submit_live_answer(uuid, int);
+drop function if exists public.host_action(uuid, text);
+drop function if exists public.get_my_active_game();
+drop function if exists public.get_global_leaderboard();
+
 -- ---------- 建立房間（任何登入者皆可當主持人） ----------
 create or replace function public.create_game(p_seconds int default 20, p_count int default 10)
 returns jsonb
