@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import heroArt from '../images/S__116113414.png'
 import { getMyActiveGame, joinGame, registerOrLogin } from '../db/api'
 import { useSessionStore } from '../stores/session'
 import { supabaseConfigured } from '../supabase'
@@ -68,6 +69,15 @@ async function submit() {
       <h1 class="font-serif text-4xl leading-snug text-blossom-600 sm:text-5xl">
         一起玩<br />即時問答派對
       </h1>
+
+      <img
+        :src="heroArt"
+        class="hero-art max-w-sm"
+        alt="兩位玩家一起玩問答派對的插畫"
+        width="1455"
+        height="1124"
+      />
+
       <p class="max-w-md font-light leading-relaxed text-ink-600">
         輸入主持人畫面上的代碼就能加入，同一時間看同一題、一起搶答。
         答得越快分數越高，每題結束立刻公布戰況，最後站上頒獎台的會是誰呢？
