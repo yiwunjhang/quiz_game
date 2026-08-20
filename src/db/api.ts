@@ -222,6 +222,21 @@ function normalizeState(raw: any): GameState {
   }
 }
 
+const SCHEMA_HINT = '請到 Supabase SQL Editor 重新執行一次 supabase/schema.sql'
+
+/** RPC 若回傳單列資料表會是陣列，回傳 jsonb 則是物件，兩種都要能吃 */
+function firstRow(data: any): any {
+  return Array.isArray(data) ? data[0] : data
+}
+
+function assertUuid(value: any, what: string): string {
+  const id = value == null ? '' : String(value)
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    throw new Error(`${what}（伺服器沒有回傳有效的房間編號）。${SCHEMA_HINT}`)
+  }
+  return id
+}
+
 /** 建立房間，回傳房間 id 與 6 位數代碼 */
 export async function createGame(
   seconds: number,
@@ -232,21 +247,30 @@ export async function createGame(
     p_count: questionCount,
   })
   if (error) throw new Error(error.message)
-  return { gameId: String(data.game_id), pin: String(data.pin) }
+  const row = firstRow(data)
+  return {
+    gameId: assertUuid(row?.game_id, '建立房間失敗'),
+    pin: String(row?.pin ?? ''),
+  }
 }
 
 /** 以房間代碼加入，回傳房間 id */
 export async function joinGame(pin: string): Promise<string> {
   const { data, error } = await supabase.rpc('join_game', { p_pin: pin.trim() })
   if (error) throw new Error(error.message)
-  return String(data)
+  // 舊版簽章可能回傳單列資料表，一併相容
+  const value = typeof data === 'object' && data !== null ? firstRow(data)?.join_game : data
+  return assertUuid(value ?? data, '加入房間失敗')
 }
 
 /** 讀取房間即時狀態 */
 export async function getGameState(gameId: string): Promise<GameState> {
-  const { data, error } = await supabase.rpc('get_game_state', { p_game_id: gameId })
+  const id = assertUuid(gameId, '無法讀取房間')
+  const { data, error } = await supabase.rpc('get_game_state', { p_game_id: id })
   if (error) throw new Error(error.message)
-  return normalizeState(data)
+  const row = firstRow(data)
+  if (!row?.game_id) throw new Error(`讀取房間狀態失敗。${SCHEMA_HINT}`)
+  return normalizeState(row)
 }
 
 /** 作答（伺服器計時計分，每題只計第一次） */
@@ -255,14 +279,15 @@ export async function submitLiveAnswer(
   selectedIndex: number,
 ): Promise<{ selected_index: number; is_correct: boolean; points: number }> {
   const { data, error } = await supabase.rpc('submit_live_answer', {
-    p_game_id: gameId,
+    p_game_id: assertUuid(gameId, '送出答案失敗'),
     p_selected_index: selectedIndex,
   })
   if (error) throw new Error(error.message)
+  const row = firstRow(data)
   return {
-    selected_index: Number(data?.selected_index),
-    is_correct: Boolean(data?.is_correct),
-    points: Number(data?.points ?? 0),
+    selected_index: Number(row?.selected_index),
+    is_correct: Boolean(row?.is_correct),
+    points: Number(row?.points ?? 0),
   }
 }
 
@@ -272,19 +297,29 @@ export async function hostAction(
   action: 'start' | 'reveal' | 'next' | 'end',
 ): Promise<GameState> {
   const { data, error } = await supabase.rpc('host_action', {
-    p_game_id: gameId,
+    p_game_id: assertUuid(gameId, '操作失敗'),
     p_action: action,
   })
   if (error) throw new Error(error.message)
-  return normalizeState(data)
+  return normalizeState(firstRow(data))
 }
 
 /** 我目前主持中或參加中的房間（重新整理後可直接回到現場） */
 export async function getMyActiveGame(): Promise<{ gameId: string; pin: string; isHost: boolean } | null> {
   const { data, error } = await supabase.rpc('get_my_active_game')
   if (error) throw new Error(error.message)
-  if (!data) return null
-  return { gameId: String(data.game_id), pin: String(data.pin), isHost: Boolean(data.is_host) }
+  const row = firstRow(data)
+  // 拿不到有效的房間編號就當作沒有進行中的遊戲，別讓首頁導到壞掉的網址
+  if (!row?.game_id) return null
+  try {
+    return {
+      gameId: assertUuid(row.game_id, ''),
+      pin: String(row.pin ?? ''),
+      isHost: Boolean(row.is_host),
+    }
+  } catch {
+    return null
+  }
 }
 
 /** 總排行榜：累計所有已結束場次的得分 */
