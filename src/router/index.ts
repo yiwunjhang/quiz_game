@@ -31,6 +31,13 @@ const router = createRouter({
       component: () => import('../views/AdminLoginView.vue'),
     },
     {
+      // 主持人在後台建立遊戲
+      path: '/admin/games',
+      name: 'admin-games',
+      component: () => import('../views/AdminGamesView.vue'),
+      meta: { requiresAdmin: true },
+    },
+    {
       path: '/admin/questions',
       name: 'admin-questions',
       component: () => import('../views/AdminQuestionsView.vue'),
@@ -51,9 +58,9 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAdmin && !session.isAdmin) {
     return { name: 'admin-login' }
   }
-  // 已登入且具管理權限者，造訪後台登入頁時直接進題庫管理
+  // 已登入且具管理權限者，造訪後台登入頁時直接進主持頁
   if (to.name === 'admin-login' && session.isAdmin) {
-    return { name: 'admin-questions' }
+    return { name: 'admin-games' }
   }
   return true
 })

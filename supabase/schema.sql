@@ -163,7 +163,7 @@ drop function if exists public.host_action(uuid, text);
 drop function if exists public.get_my_active_game();
 drop function if exists public.get_global_leaderboard();
 
--- ---------- 建立遊戲（任何登入者皆可當主持人） ----------
+-- ---------- 建立遊戲（限後台主持人帳號，即 profiles.is_admin = true） ----------
 create or replace function public.create_game(p_seconds int default 20, p_count int default 10)
 returns jsonb
 language plpgsql
@@ -177,6 +177,13 @@ declare
 begin
   if auth.uid() is null then
     raise exception '尚未登入';
+  end if;
+
+  -- 遊戲一律由主持人在後台建立；前台參加者只能用代碼加入
+  if not exists (
+    select 1 from public.profiles p where p.id = auth.uid() and p.is_admin
+  ) then
+    raise exception '只有後台主持人帳號可以建立遊戲';
   end if;
 
   select array(

@@ -194,7 +194,7 @@ async function copyPin() {
       </div>
 
       <div class="flex justify-center gap-4">
-        <button class="btn btn-primary" @click="router.push({ name: 'home' })">再開一場</button>
+        <button class="btn btn-primary" @click="router.push({ name: 'admin-games' })">再開一場</button>
         <button class="btn btn-ghost" @click="router.push({ name: 'leaderboard' })">
           總排行榜
         </button>
