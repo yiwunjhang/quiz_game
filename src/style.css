@@ -365,6 +365,16 @@ body {
   box-shadow: none;
   transform: none !important;
 }
+
+/* ---------- 首頁主視覺：去背插圖，直接浮在頁面上 ---------- */
+.hero-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* 沿著去背輪廓的柔和影子，讓插圖不像直接貼上去的 */
+  filter: drop-shadow(0 16px 20px rgb(201 96 96 / 0.16));
+  animation: hero-float 5.5s ease-in-out infinite;
+}
 } /* @layer components 結束 */
 
 /* ---------- 動畫 ---------- */
@@ -434,4 +444,21 @@ body {
 
 .timer-ring circle {
   transition: stroke-dashoffset 0.25s linear;
+}
+
+/* 主視覺插圖的緩慢漂浮 */
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(-1.2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-art {
+    animation: none;
+  }
 }
