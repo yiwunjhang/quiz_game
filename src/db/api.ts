@@ -34,8 +34,8 @@ export interface LeaderboardRow {
 /* ------------------------------------------------------------------ */
 
 // 暱稱可能含中文或空白，無法直接當 email，這裡編碼成合法的 email local part。
-// 若 Supabase 拒絕此網域，可改這個常數（例如改成你擁有的網域）。
-const EMAIL_DOMAIN = 'quizgame.local'
+// 注意：Supabase 會拒絕 .local 等無效網域，需用有效 TLD（實測 quizgame.com 可用）。
+const EMAIL_DOMAIN = 'quizgame.com'
 
 function emailForNickname(nickname: string): string {
   const bytes = new TextEncoder().encode(nickname.trim().toLowerCase())
@@ -75,8 +75,17 @@ export async function registerOrLogin(nickname: string, password: string): Promi
       options: { data: { nickname: name } },
     })
     if (signUp.error) {
-      // 註冊也失敗，通常是暱稱已被使用但密碼不對
-      throw new Error('此暱稱已被使用，且密碼不正確')
+      const msg = signUp.error.message ?? ''
+      const code = (signUp.error as any).code ?? ''
+      if (code === 'user_already_exists' || /already registered|already been registered/i.test(msg)) {
+        // 暱稱(email)已存在但密碼不符 → 既有帳號、密碼錯誤
+        throw new Error('此暱稱已被使用，且密碼不正確')
+      }
+      if (code === 'weak_password' || /at least 6 characters|password/i.test(msg)) {
+        throw new Error('密碼太短，請至少輸入 6 個字元')
+      }
+      // 其他錯誤原樣顯示，方便排錯
+      throw new Error('註冊失敗：' + msg)
     }
     if (!signUp.data.session) {
       throw new Error('註冊成功但未取得登入狀態，請確認 Supabase 已關閉 Email 驗證')
