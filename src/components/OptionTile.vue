@@ -28,12 +28,12 @@ const classes = computed(() => {
   const list = [`opt-${props.index % 6}`]
   if (props.revealed) {
     if (props.isCorrect) list.push('opt-correct')
-    else if (props.picked) list.push('opt-wrong', 'opt-dim')
+    else if (props.picked) list.push('opt-wrong')
     else list.push('opt-dim')
   } else if (props.picked) {
-    list.push('opt-correct')
+    list.push('opt-picked')
   }
-  if (props.large) list.push('text-lg sm:text-xl py-5')
+  if (props.large) list.push('text-lg py-5 sm:text-xl')
   return list
 })
 </script>
@@ -45,11 +45,21 @@ const classes = computed(() => {
 
     <span
       v-if="count != null"
-      class="flex-none rounded-full bg-white/70 px-3 py-1 text-sm font-bold text-plum-600"
+      class="flex-none rounded-full border border-blossom-200 bg-blossom-50 px-3 py-1 text-xs font-medium tracking-widest text-ink-600"
     >
       {{ count }} 人
     </span>
-    <span v-else-if="revealed && isCorrect" class="flex-none text-xl">✅</span>
-    <span v-else-if="picked && !revealed" class="flex-none text-xl">✓</span>
+    <span
+      v-else-if="revealed && isCorrect"
+      class="flex-none text-sm font-medium tracking-widest text-sage-600"
+    >
+      正解
+    </span>
+    <span
+      v-else-if="picked && !revealed"
+      class="flex-none text-sm font-medium tracking-widest text-blossom-600"
+    >
+      已選
+    </span>
   </button>
 </template>

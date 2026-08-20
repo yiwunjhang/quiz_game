@@ -1,11 +1,10 @@
-# 🌸 粉紅問答派對 (Quiz Party)
+# 🌸 Quiz Party 問答派對
 
 Kahoot 式的**即時多人問答遊戲**：主持人開房間、所有人用 6 位數代碼加入，
 同一時間看同一題、一起搶答，答得越快分數越高，最後站上頒獎台。
 
 技術為 **Vue 3 + Vite + TypeScript + Tailwind CSS v4**，
 後端使用 **Supabase（Postgres + Auth + Realtime）**，前端部署到 **GitHub Pages**。
-視覺是粉嫩色系的毛玻璃（glassmorphism）風格。
 
 ## 功能
 

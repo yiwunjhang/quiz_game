@@ -71,73 +71,66 @@ async function submit() {
 </script>
 
 <template>
-  <div class="grid items-center gap-8 md:grid-cols-2">
+  <div class="grid items-center gap-14 md:grid-cols-2">
     <!-- 左側介紹 -->
-    <div class="space-y-5">
-      <h1 class="text-4xl font-black leading-tight text-plum-800 sm:text-5xl">
-        一起玩
-        <span
-          class="bg-gradient-to-r from-blush-500 to-lilac-500 bg-clip-text text-transparent"
-          >即時問答派對</span
-        >
-        🎀
+    <div class="animate-fade-up space-y-6">
+      <p class="section-subtitle text-left">LIVE QUIZ PARTY</p>
+      <h1 class="font-serif text-4xl leading-snug text-blossom-600 sm:text-5xl">
+        一起玩<br />即時問答派對
       </h1>
-      <p class="text-plum-600">
+      <p class="max-w-md font-light leading-relaxed text-ink-600">
         主持人開房間、大家用房間代碼加入，同一時間看同一題、一起搶答。
         答得越快分數越高，每題結束立刻公布戰況，最後站上頒獎台的會是誰呢？
       </p>
-      <ul class="space-y-2 text-sm text-plum-500">
-        <li class="glass-soft px-4 py-2">👥 多人同時上線，所有裝置畫面同步</li>
-        <li class="glass-soft px-4 py-2">⚡ 依作答速度計分，最高 1000 分／題</li>
-        <li class="glass-soft px-4 py-2">🛡️ 答案由伺服器保管，公布前誰都拿不到</li>
+      <ul class="space-y-3 text-sm font-light text-ink-600">
+        <li class="flex gap-3">
+          <span class="text-blossom-500">—</span> 多人同時上線，所有裝置畫面同步
+        </li>
+        <li class="flex gap-3">
+          <span class="text-blossom-500">—</span> 依作答速度計分，最高 1000 分／題
+        </li>
+        <li class="flex gap-3">
+          <span class="text-blossom-500">—</span> 答案由伺服器保管，公布前誰都拿不到
+        </li>
       </ul>
     </div>
 
     <!-- 右側加入卡 -->
-    <div class="glass glass-strong p-6 sm:p-7">
+    <div class="card animate-fade-up p-7 sm:p-8" style="animation-delay: 120ms">
       <div
         v-if="!supabaseConfigured"
-        class="mb-4 rounded-2xl border border-peach-400/60 bg-peach-200/60 px-4 py-3 text-sm text-plum-700"
+        class="mb-5 rounded-2xl border border-sand-300 bg-sand-100 px-4 py-3 text-sm text-ink-800"
       >
-        ⚠️ 尚未設定 Supabase 連線資訊，請參考 README 設定環境變數。
+        尚未設定 Supabase 連線資訊，請參考 README 設定環境變數。
       </div>
 
       <div
         v-if="active"
-        class="mb-5 rounded-2xl border border-lilac-300/70 bg-lilac-100/70 px-4 py-3 text-sm"
+        class="mb-6 rounded-2xl border border-blossom-300 bg-blossom-50 px-4 py-3 text-sm"
       >
-        <p class="font-bold text-plum-700">
-          你有一場進行中的遊戲（代碼 {{ active.pin }}）
-        </p>
-        <button
-          class="btn btn-primary btn-sm mt-2"
-          @click="goToGame(active.gameId, active.isHost)"
-        >
-          回到遊戲 →
+        <p class="text-ink-800">你有一場進行中的遊戲（代碼 {{ active.pin }}）</p>
+        <button class="btn btn-primary btn-sm mt-3" @click="goToGame(active.gameId, active.isHost)">
+          回到遊戲
         </button>
       </div>
 
       <!-- 模式切換 -->
-      <div class="mb-5 flex gap-1 rounded-full bg-white/50 p-1">
+      <div class="mb-7 flex justify-center gap-8 border-b border-blossom-200 pb-3">
         <button
           v-for="m in (['join', 'host'] as const)"
           :key="m"
           type="button"
-          class="flex-1 rounded-full py-2 text-sm font-bold transition"
-          :class="
-            mode === m
-              ? 'bg-gradient-to-r from-blush-400 to-lilac-400 text-white shadow-md'
-              : 'text-plum-500 hover:bg-white/60'
-          "
+          class="nav-link pb-1 text-sm tracking-widest transition-colors duration-300"
+          :class="mode === m ? 'is-active text-blossom-600' : 'text-ink-400 hover:text-blossom-500'"
           @click="mode = m"
         >
-          {{ m === 'join' ? '🎮 加入遊戲' : '🎤 我要開房間' }}
+          {{ m === 'join' ? '加入遊戲' : '我要開房間' }}
         </button>
       </div>
 
-      <form class="space-y-4" @submit.prevent="submit">
+      <form class="space-y-5" @submit.prevent="submit">
         <div v-if="mode === 'join'">
-          <label class="mb-1 block text-sm font-semibold text-plum-600">房間代碼</label>
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">房間代碼</label>
           <input
             v-model="pin"
             inputmode="numeric"
@@ -147,26 +140,30 @@ async function submit() {
           />
         </div>
 
-        <template v-else>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="mb-1 block text-sm font-semibold text-plum-600">題數</label>
-              <input v-model.number="questionCount" type="number" min="1" max="50" class="field" />
-            </div>
-            <div>
-              <label class="mb-1 block text-sm font-semibold text-plum-600">每題秒數</label>
-              <input v-model.number="seconds" type="number" min="5" max="120" class="field" />
-            </div>
+        <div v-else class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="mb-2 block text-xs tracking-widest text-ink-400">題數</label>
+            <input v-model.number="questionCount" type="number" min="1" max="50" class="field" />
           </div>
-        </template>
-
-        <div>
-          <label class="mb-1 block text-sm font-semibold text-plum-600">暱稱</label>
-          <input v-model="nickname" type="text" maxlength="20" placeholder="例如：小花" class="field" />
+          <div>
+            <label class="mb-2 block text-xs tracking-widest text-ink-400">每題秒數</label>
+            <input v-model.number="seconds" type="number" min="5" max="120" class="field" />
+          </div>
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-semibold text-plum-600">密碼</label>
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">暱稱</label>
+          <input
+            v-model="nickname"
+            type="text"
+            maxlength="20"
+            placeholder="例如：小花"
+            class="field"
+          />
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">密碼</label>
           <input
             v-model="password"
             type="password"
@@ -175,12 +172,10 @@ async function submit() {
           />
         </div>
 
-        <p v-if="error" class="text-sm font-semibold text-blush-600">{{ error }}</p>
+        <p v-if="error" class="text-sm text-blossom-600">{{ error }}</p>
 
         <button type="submit" :disabled="loading" class="btn btn-primary w-full">
-          {{
-            loading ? '處理中…' : mode === 'join' ? '加入房間 →' : '建立房間 →'
-          }}
+          {{ loading ? '處理中…' : mode === 'join' ? '加入房間' : '建立房間' }}
         </button>
       </form>
     </div>

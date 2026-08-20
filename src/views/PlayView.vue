@@ -66,36 +66,44 @@ async function choose(i: number) {
 </script>
 
 <template>
-  <div v-if="loading" class="py-24 text-center text-plum-400">連線中…</div>
-
-  <div v-else-if="!state" class="glass mx-auto max-w-md p-8 text-center">
-    <p class="text-blush-600">{{ error || '找不到這個房間' }}</p>
-    <button class="btn btn-ghost mt-4" @click="router.push({ name: 'home' })">回首頁</button>
+  <div v-if="loading" class="flex flex-col items-center gap-4 py-24">
+    <div class="loader-ring"></div>
+    <p class="section-subtitle">CONNECTING</p>
   </div>
 
-  <div v-else class="mx-auto max-w-2xl space-y-5">
+  <div v-else-if="!state" class="card mx-auto max-w-md p-10 text-center">
+    <p class="text-blossom-600">{{ error || '找不到這個房間' }}</p>
+    <button class="btn btn-ghost mt-6" @click="router.push({ name: 'home' })">回首頁</button>
+  </div>
+
+  <div v-else class="mx-auto max-w-2xl space-y-6">
     <!-- ============ 等待開始 ============ -->
     <template v-if="phase === 'lobby'">
-      <div class="glass glass-strong p-8 text-center">
-        <p class="text-5xl animate-bob">🌸</p>
-        <h1 class="mt-4 text-2xl font-black text-plum-800">
-          {{ session.currentUser?.nickname }}，你已經入座！
+      <div class="card animate-fade-up p-10 text-center">
+        <p class="section-subtitle">WELCOME</p>
+        <h1 class="mt-3 font-serif text-2xl text-blossom-600">
+          {{ session.currentUser?.nickname }}，你已經入座
         </h1>
-        <p class="mt-2 text-plum-500 animate-soft-pulse">等待主持人開始遊戲…</p>
-        <p class="mt-4 text-sm text-plum-400">
-          房間代碼 <span class="font-bold tracking-widest text-plum-600">{{ state.pin }}</span>
-          · 目前 {{ state.player_count }} 人
+        <p class="mt-3 animate-soft-pulse text-sm font-light text-ink-600">
+          等待主持人開始遊戲…
+        </p>
+        <p class="mt-6 text-xs tracking-widest text-ink-400">
+          房間代碼 {{ state.pin }} · 目前 {{ state.player_count }} 人
         </p>
       </div>
 
-      <div class="glass p-5">
-        <h2 class="mb-3 text-sm font-extrabold text-plum-600">房間裡的人</h2>
+      <div class="card p-6">
+        <p class="section-subtitle mb-4 text-left">PLAYERS</p>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="p in players"
             :key="p.user_id"
-            class="glass-soft animate-pop px-3 py-1.5 text-sm font-bold text-plum-700"
-            :class="p.user_id === meId ? 'ring-2 ring-lilac-400/80' : ''"
+            class="animate-fade-up rounded-full border px-4 py-1.5 text-sm"
+            :class="
+              p.user_id === meId
+                ? 'border-blossom-500 bg-blossom-100 text-blossom-600'
+                : 'border-blossom-300 bg-blossom-50 text-ink-800'
+            "
           >
             {{ p.nickname }}
           </span>
@@ -105,31 +113,27 @@ async function choose(i: number) {
 
     <!-- ============ 作答中 ============ -->
     <template v-else-if="phase === 'question'">
-      <div class="flex items-center justify-between gap-3">
-        <span class="glass-soft px-4 py-2 text-sm font-bold text-plum-600">
-          第 {{ state.index + 1 }} / {{ state.total }} 題
-        </span>
-        <span class="glass-soft px-4 py-2 text-sm font-bold text-plum-600">
-          我的分數 {{ state.my_score ?? 0 }}
-        </span>
+      <div class="flex items-center justify-between text-xs tracking-widest text-ink-400">
+        <span>QUESTION {{ state.index + 1 }} / {{ state.total }}</span>
+        <span>SCORE {{ state.my_score ?? 0 }}</span>
       </div>
 
-      <div class="glass glass-strong flex items-start gap-4 p-6">
+      <div class="card flex items-center gap-5 p-7">
         <TimerRing :seconds="remainingSec" :ratio="remainingRatio" :size="76" />
-        <h2 class="flex-1 text-xl font-black leading-snug text-plum-800 sm:text-2xl">
+        <h2 class="flex-1 font-serif text-xl leading-snug text-ink-900 sm:text-2xl">
           {{ question?.text }}
         </h2>
       </div>
 
-      <div v-if="answered" class="glass p-8 text-center animate-pop">
-        <p class="text-4xl animate-bob">💫</p>
-        <p class="mt-3 text-lg font-extrabold text-plum-700">已送出答案！</p>
-        <p class="mt-1 text-sm text-plum-500">
+      <div v-if="answered" class="card animate-fade-up p-10 text-center">
+        <p class="section-subtitle">ANSWER SUBMITTED</p>
+        <p class="mt-3 font-serif text-xl text-blossom-600">已送出答案</p>
+        <p class="mt-2 text-sm font-light text-ink-600">
           等待其他人作答（{{ state.answer_count }} / {{ state.player_count }}）
         </p>
       </div>
 
-      <div v-else class="grid gap-3 sm:grid-cols-2">
+      <div v-else class="grid gap-4 sm:grid-cols-2">
         <OptionTile
           v-for="(opt, i) in question?.options ?? []"
           :key="i"
@@ -140,39 +144,33 @@ async function choose(i: number) {
         />
       </div>
 
-      <p v-if="submitError" class="text-center text-sm font-semibold text-blush-600">
-        {{ submitError }}
-      </p>
+      <p v-if="submitError" class="text-center text-sm text-blossom-600">{{ submitError }}</p>
     </template>
 
     <!-- ============ 公布答案 ============ -->
     <template v-else-if="phase === 'reveal'">
-      <div
-        class="glass glass-strong p-7 text-center animate-pop"
-        :class="myAnswer?.is_correct ? 'ring-2 ring-mint-400/70' : ''"
-      >
+      <div class="card animate-fade-up p-8 text-center">
         <template v-if="!myAnswer">
-          <p class="text-4xl">⏰</p>
-          <p class="mt-3 text-xl font-black text-plum-700">時間到，這題沒作答</p>
+          <p class="section-subtitle">TIME UP</p>
+          <p class="mt-3 font-serif text-xl text-ink-600">時間到，這題沒作答</p>
         </template>
         <template v-else-if="myAnswer.is_correct">
-          <p class="text-5xl animate-bob">🎊</p>
-          <p class="mt-3 text-2xl font-black text-mint-500">答對了！</p>
-          <p class="mt-1 text-lg font-extrabold text-blush-600">+{{ myAnswer.points }} 分</p>
+          <p class="section-subtitle" style="color: var(--color-sage-500)">CORRECT</p>
+          <p class="mt-3 font-serif text-3xl text-sage-600">答對了</p>
+          <p class="mt-2 font-serif text-xl text-blossom-600">+{{ myAnswer.points }}</p>
         </template>
         <template v-else>
-          <p class="text-5xl">🥺</p>
-          <p class="mt-3 text-2xl font-black text-blush-600">答錯了</p>
-          <p class="mt-1 text-sm text-plum-500">下一題再加油！</p>
+          <p class="section-subtitle">INCORRECT</p>
+          <p class="mt-3 font-serif text-3xl text-blossom-600">答錯了</p>
+          <p class="mt-2 text-sm font-light text-ink-600">下一題再加油</p>
         </template>
 
-        <p class="mt-4 text-sm text-plum-500">
-          目前總分 <span class="font-extrabold text-plum-700">{{ state.my_score ?? 0 }}</span>
-          <span v-if="myRank"> · 第 {{ myRank }} 名</span>
+        <p class="mt-6 text-xs tracking-widest text-ink-400">
+          總分 {{ state.my_score ?? 0 }}<span v-if="myRank"> · 第 {{ myRank }} 名</span>
         </p>
       </div>
 
-      <div class="grid gap-3 sm:grid-cols-2">
+      <div class="grid gap-4 sm:grid-cols-2">
         <OptionTile
           v-for="(opt, i) in question?.options ?? []"
           :key="i"
@@ -186,29 +184,31 @@ async function choose(i: number) {
         />
       </div>
 
-      <div class="glass p-5">
-        <h3 class="mb-3 text-sm font-extrabold text-plum-600">目前戰況 🏅</h3>
+      <div class="card p-6">
+        <p class="section-subtitle mb-2 text-left">STANDINGS</p>
         <RankList :players="players" :me-id="meId" :limit="5" />
       </div>
 
-      <p class="text-center text-sm text-plum-400 animate-soft-pulse">等待主持人進入下一題…</p>
+      <p class="animate-soft-pulse text-center text-xs tracking-widest text-ink-400">
+        等待主持人進入下一題…
+      </p>
     </template>
 
     <!-- ============ 結算 ============ -->
     <template v-else>
-      <div class="glass glass-strong p-6 text-center sm:p-8">
-        <h2 class="mb-1 text-3xl font-black text-plum-800">🎉 遊戲結束！</h2>
-        <p class="mb-6 text-plum-500">
-          你拿到 <span class="font-extrabold text-blush-600">{{ state.my_score ?? 0 }}</span> 分
-          <span v-if="myRank">，排名第 {{ myRank }}</span>
+      <div class="card p-8 text-center sm:p-10">
+        <p class="section-subtitle">FINAL RESULT</p>
+        <h2 class="section-title">遊戲結束</h2>
+        <p class="mb-10 text-sm font-light text-ink-600">
+          你拿到 {{ state.my_score ?? 0 }} 分<span v-if="myRank">，排名第 {{ myRank }}</span>
         </p>
         <Podium :players="players" :me-id="meId" />
       </div>
 
-      <div class="flex justify-center gap-3">
+      <div class="flex justify-center gap-4">
         <button class="btn btn-primary" @click="router.push({ name: 'home' })">回首頁</button>
         <button class="btn btn-ghost" @click="router.push({ name: 'leaderboard' })">
-          總排行榜 🏆
+          總排行榜
         </button>
       </div>
     </template>

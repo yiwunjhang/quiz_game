@@ -29,30 +29,33 @@ async function submit() {
 
 <template>
   <div class="mx-auto max-w-sm">
-    <div class="glass glass-strong p-7">
-      <h1 class="text-xl font-black text-plum-800">⚙️ 後台登入</h1>
-      <p class="mb-5 mt-1 text-sm text-plum-500">以具備管理權限的帳號登入以管理題庫</p>
+    <div class="card animate-fade-up p-8">
+      <div class="mb-7 text-center">
+        <p class="section-subtitle">ADMIN</p>
+        <h1 class="font-serif text-2xl text-blossom-600">後台登入</h1>
+        <p class="mt-1 text-sm font-light text-ink-600">以具備管理權限的帳號登入以管理題庫</p>
+      </div>
 
-      <form class="space-y-4" @submit.prevent="submit">
+      <form class="space-y-5" @submit.prevent="submit">
         <div>
-          <label class="mb-1 block text-sm font-semibold text-plum-600">管理者暱稱</label>
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">管理者暱稱</label>
           <input v-model="nickname" type="text" placeholder="管理帳號暱稱" class="field" />
         </div>
         <div>
-          <label class="mb-1 block text-sm font-semibold text-plum-600">密碼</label>
+          <label class="mb-2 block text-xs tracking-widest text-ink-400">密碼</label>
           <input v-model="password" type="password" placeholder="密碼" class="field" />
         </div>
 
-        <p v-if="error" class="text-sm font-semibold text-blush-600">{{ error }}</p>
+        <p v-if="error" class="text-sm text-blossom-600">{{ error }}</p>
 
         <button type="submit" :disabled="loading" class="btn btn-primary w-full">
           {{ loading ? '登入中…' : '登入' }}
         </button>
       </form>
 
-      <p class="mt-5 text-xs text-plum-400">
+      <p class="mt-6 text-xs font-light leading-relaxed text-ink-400">
         管理權限需在 Supabase 將該帳號
-        <code class="rounded bg-white/60 px-1 text-plum-600">profiles.is_admin</code>
+        <code class="rounded bg-blossom-100 px-1 text-blossom-600">profiles.is_admin</code>
         設為 true，詳見 README。
       </p>
     </div>

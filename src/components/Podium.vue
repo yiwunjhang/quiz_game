@@ -8,9 +8,9 @@ const props = defineProps<{ players: GamePlayer[]; meId?: string | null }>()
 const podium = computed(() => {
   const [first, second, third] = props.players
   return [
-    { p: second, rank: 2, height: 'h-24 sm:h-32', medal: '🥈' },
-    { p: first, rank: 1, height: 'h-32 sm:h-44', medal: '🥇' },
-    { p: third, rank: 3, height: 'h-16 sm:h-24', medal: '🥉' },
+    { p: second, rank: 2, height: 'h-20 sm:h-28' },
+    { p: first, rank: 1, height: 'h-28 sm:h-40' },
+    { p: third, rank: 3, height: 'h-14 sm:h-20' },
   ].filter((s) => s.p)
 })
 
@@ -19,40 +19,39 @@ const rest = computed(() => props.players.slice(3))
 
 <template>
   <div>
-    <div class="flex items-end justify-center gap-3 sm:gap-5">
+    <div class="flex items-end justify-center gap-4 sm:gap-6">
       <div
         v-for="(slot, i) in podium"
         :key="slot.rank"
-        class="flex w-24 flex-col items-center sm:w-32 animate-pop"
-        :style="{ animationDelay: 120 * i + 'ms' }"
+        class="animate-fade-up flex w-24 flex-col items-center sm:w-32"
+        :style="{ animationDelay: 140 * i + 'ms' }"
       >
-        <span class="text-3xl sm:text-4xl animate-bob">{{ slot.medal }}</span>
         <span
-          class="mt-1 max-w-full truncate text-center text-sm font-extrabold text-plum-700 sm:text-base"
-          :class="slot.p.user_id === meId ? 'text-lilac-500' : ''"
+          class="max-w-full truncate text-center text-sm font-medium sm:text-base"
+          :class="slot.p.user_id === meId ? 'text-blossom-600' : 'text-ink-800'"
         >
           {{ slot.p.nickname }}
         </span>
-        <span class="text-xs font-bold text-blush-600">{{ slot.p.score }} 分</span>
+        <span class="mt-0.5 font-serif text-lg text-blossom-500">{{ slot.p.score }}</span>
         <div
-          class="glass mt-2 w-full rounded-t-2xl rounded-b-none border-b-0 grid place-items-center"
-          :class="slot.height"
+          class="mt-3 grid w-full place-items-center rounded-t-2xl border border-b-0 border-blossom-200"
+          :class="[slot.height, slot.rank === 1 ? 'bg-blossom-100' : 'bg-white']"
         >
-          <span class="text-2xl font-black text-plum-400/70 sm:text-3xl">{{ slot.rank }}</span>
+          <span class="font-serif text-3xl text-blossom-500 sm:text-4xl">{{ slot.rank }}</span>
         </div>
       </div>
     </div>
 
-    <ul v-if="rest.length" class="mt-6 space-y-2">
+    <ul v-if="rest.length" class="mx-auto mt-8 max-w-sm divide-y divide-blossom-200">
       <li
         v-for="(p, i) in rest"
         :key="p.user_id"
-        class="glass-soft flex items-center gap-3 px-4 py-2"
-        :class="p.user_id === meId ? 'ring-2 ring-lilac-400/80' : ''"
+        class="flex items-center gap-4 py-2.5"
+        :class="p.user_id === meId ? 'text-blossom-600' : 'text-ink-800'"
       >
-        <span class="w-7 flex-none text-center font-bold text-plum-400">{{ i + 4 }}</span>
-        <span class="flex-1 truncate font-semibold text-plum-700">{{ p.nickname }}</span>
-        <span class="font-extrabold tabular-nums text-blush-600">{{ p.score }}</span>
+        <span class="w-7 flex-none text-center font-serif text-ink-400">{{ i + 4 }}</span>
+        <span class="flex-1 truncate font-medium">{{ p.nickname }}</span>
+        <span class="font-serif tabular-nums text-blossom-600">{{ p.score }}</span>
       </li>
     </ul>
   </div>
