@@ -6,3 +6,8 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 *.log
+
+# TypeScript / vue-tsc composite build 產生的衍生檔
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
