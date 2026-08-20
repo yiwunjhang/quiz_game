@@ -7,6 +7,9 @@
    ===================================================================== */
 
 @theme {
+  /* 頁面底色，比卡片內的奶油白再淡一階 */
+  --color-canvas: #fffbfa;
+
   /* 珊瑚粉主色系 */
   --color-blossom-50: #fff8f7;
   --color-blossom-100: #fff0ee;
@@ -54,7 +57,7 @@
 
 html {
   scroll-behavior: smooth;
-  scrollbar-color: var(--color-blossom-500) var(--color-blossom-50);
+  scrollbar-color: var(--color-blossom-500) var(--color-canvas);
   scrollbar-width: thin;
 }
 
@@ -69,14 +72,19 @@ body {
   font-family: var(--font-sans);
   font-weight: 400;
   color: var(--color-ink-800);
-  background: var(--color-blossom-50);
+  background-color: var(--color-canvas);
+  /* 60×60 可平鋪的小十字紋理，讓大片留白不會太空 */
+  background-image: url('./images/bg-01.svg');
+  background-repeat: repeat;
+  /* 搭配 viewport-fit=cover，避開瀏海與底部 home indicator */
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 ::-webkit-scrollbar {
   width: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-blossom-50);
+  background: var(--color-canvas);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--color-blossom-500);
@@ -242,6 +250,8 @@ body {
   width: 100%;
   border-radius: 1rem;
   padding: 0.7rem 1.1rem;
+  /* 不能小於 16px，否則 iOS Safari 一聚焦就會自動放大整頁 */
+  font-size: 1rem;
   color: var(--color-ink-900);
   background: #fff;
   border: 1px solid var(--color-blossom-300);
@@ -259,14 +269,24 @@ body {
   box-shadow: 0 0 0 4px var(--color-blossom-200);
 }
 
+/* 代碼輸入框：小螢幕縮一階，六位數加上字距才不會撐出邊界 */
 .field-pin {
   text-align: center;
   font-family: var(--font-serif);
-  font-size: 2.25rem;
-  letter-spacing: 0.35em;
-  text-indent: 0.35em;
+  font-size: 1.75rem;
+  letter-spacing: 0.28em;
+  text-indent: 0.28em;
   color: var(--color-blossom-600);
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .field-pin {
+    font-size: 2.25rem;
+    letter-spacing: 0.35em;
+    text-indent: 0.35em;
+    padding: 0.75rem 1rem;
+  }
 }
 
 /* ---------- 答案磚：白底 + 各自的色票，維持畫廊的乾淨感 ---------- */
@@ -366,14 +386,179 @@ body {
   transform: none !important;
 }
 
-/* ---------- 首頁主視覺：去背插圖，直接浮在頁面上 ---------- */
+/* =====================================================================
+   排行榜前三名長條圖
+   單一數列（總分），用同色相的順序色階：分數越高顏色越深。
+   三階對白底皆 ≥ 3:1；名次與名字都是直接標籤，識別不靠顏色。
+   ===================================================================== */
+/* 馬卡龍淺色填充，不加外框。
+   淺色對白底約 1.7~1.9:1（低於 3:1），所以每根都有名字與分數的直接標籤，
+   下方完整名次列表也充當表格版本，靠這兩者補足辨識。
+   避開紅配綠這組色盲混淆對，第三名用藍而非綠。
+   --rank-accent 是同色系深一階，只給皇冠這類圖示用。 */
+.rank-1 {
+  --rank-fill: #f0bd78; /* 杏桃金 */
+  --rank-accent: #b8811f;
+}
+
+.rank-2 {
+  --rank-fill: #f4a3b0; /* 玫瑰粉 */
+  --rank-accent: #d85f76;
+}
+
+.rank-3 {
+  --rank-fill: #9cc0e2; /* 薰衣草藍 */
+  --rank-accent: #4a86bb;
+}
+
+.podium-chart {
+  --podium-max: 150px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.5rem;
+  /* 讓長條有一條可站的基準線，刻意畫得很輕 */
+  border-bottom: 1px solid var(--color-blossom-200);
+}
+
+@media (min-width: 640px) {
+  .podium-chart {
+    --podium-max: 200px;
+    gap: 1.25rem;
+  }
+}
+
+.podium-col {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 8rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  text-align: center;
+}
+
+.podium-crown {
+  width: 1.4rem;
+  margin-bottom: 0.15rem;
+  color: var(--rank-accent);
+}
+
+.podium-bar {
+  width: 100%;
+  margin-top: 0.5rem;
+  /* 資料端（上方）圓角，基準線那端維持平切 */
+  border-radius: 4px 4px 0 0;
+  background: var(--rank-fill);
+  transition: height 0.9s cubic-bezier(0.22, 0.75, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .podium-bar {
+    transition: none;
+  }
+}
+
+/* ---------- 首頁主視覺：去背插圖 + 環繞的 bi-stars ---------- */
 .hero-art {
+  position: relative;
+  display: block;
+  width: 100%;
+  /* 星星跟著人物一起漂浮，所以動畫掛在外層 */
+  animation: hero-float 5.5s ease-in-out infinite;
+}
+
+.hero-art-img {
   display: block;
   width: 100%;
   height: auto;
   /* 沿著去背輪廓的柔和影子，讓插圖不像直接貼上去的 */
   filter: drop-shadow(0 16px 20px rgb(201 96 96 / 0.16));
-  animation: hero-float 5.5s ease-in-out infinite;
+}
+
+.hero-star {
+  position: absolute;
+  color: var(--color-blossom-500);
+  animation: twinkle 2.8s ease-in-out infinite;
+}
+
+/* 三顆分別落在人物周圍的空白處，大小與節奏都錯開 */
+.hero-star-1 {
+  top: 5%;
+  right: 13%;
+  width: 11%;
+  animation-delay: 0s;
+}
+
+.hero-star-2 {
+  top: 33%;
+  left: 16%;
+  width: 7%;
+  color: var(--color-sand-500);
+  animation-delay: 0.9s;
+}
+
+.hero-star-3 {
+  bottom: 20%;
+  right: 11%;
+  width: 8.5%;
+  animation-delay: 1.7s;
+}
+
+/* ---------- 首頁開場：整塊都是按鈕，手機上點哪裡都能進 ---------- */
+.splash {
+  display: flex;
+  width: 100%;
+  min-height: 68vh;
+  min-height: 68dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1rem 0 2rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* 開場的插圖比桌機大一點，並多一段落定動畫 */
+.splash-art {
+  width: min(76vw, 320px);
+  margin-bottom: 0.75rem;
+  /* 先落下就位，接著才交給無限漂浮 */
+  animation:
+    splash-in 0.9s cubic-bezier(0.2, 0.8, 0.25, 1) both,
+    hero-float 5.5s ease-in-out 0.9s infinite;
+}
+
+.splash-art .hero-art-img {
+  filter: drop-shadow(0 18px 24px rgb(201 96 96 / 0.18));
+}
+
+/* 星星等人物落定後才閃 */
+.splash-art .hero-star {
+  animation-delay: 0.9s;
+}
+
+.splash-art .hero-star-2 {
+  animation-delay: 1.8s;
+}
+
+.splash-art .hero-star-3 {
+  animation-delay: 2.6s;
+}
+
+.splash-hint {
+  display: inline-block;
+  margin-top: 1rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-blossom-300);
+  background: #fff;
+  padding: 0.55rem 1.4rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.2em;
+  color: var(--color-blossom-600);
+  box-shadow: var(--shadow-soft);
 }
 } /* @layer components 結束 */
 
@@ -460,5 +645,110 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .hero-art {
     animation: none;
+  }
+}
+
+/* 開場插圖落下就位 */
+@keyframes splash-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 開場 → 主畫面的切換 */
+.splash-enter-active,
+.splash-leave-active {
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+
+.splash-enter-from {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+.splash-leave-to {
+  opacity: 0;
+  transform: translateY(-16px) scale(0.98);
+}
+
+/* =====================================================================
+   觸控裝置：確保點擊區夠大，並拿掉會「黏住」的 hover 效果
+   ===================================================================== */
+.btn,
+.opt,
+.splash,
+.nav-link {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: none) {
+  .btn {
+    min-height: 44px;
+  }
+
+  .btn-sm {
+    min-height: 38px;
+  }
+
+  /* 搶答時手指要好按 */
+  .opt {
+    min-height: 60px;
+  }
+
+  /* 手機沒有滑鼠，hover 樣式會在點完後留著不放 */
+  .opt:hover:not(:disabled),
+  .card-hover:hover {
+    background: #fff;
+    box-shadow: var(--shadow-soft);
+    transform: none;
+  }
+
+  .opt:hover:not(:disabled) {
+    border-color: var(--color-blossom-200);
+  }
+
+  /* 改用按下的瞬間回饋 */
+  .opt:active:not(:disabled) {
+    background: var(--opt-tint);
+    border-color: var(--opt);
+    transform: scale(0.985);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-art {
+    animation: none;
+  }
+}
+
+/* bi-stars 的閃爍 */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8) rotate(-6deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12) rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-star {
+    animation: none;
+    opacity: 0.75;
   }
 }
