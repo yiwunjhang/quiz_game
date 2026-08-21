@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import OptionTile from '../components/OptionTile.vue'
-import Podium from '../components/Podium.vue'
+import TopThreeChart from '../components/TopThreeChart.vue'
 import RankList from '../components/RankList.vue'
 import TimerRing from '../components/TimerRing.vue'
 import { submitLiveAnswer } from '../db/api'
@@ -199,10 +199,21 @@ async function choose(i: number) {
       <div class="card p-6 text-center sm:p-10">
         <p class="section-subtitle">FINAL RESULT</p>
         <h2 class="section-title">遊戲結束</h2>
-        <p class="mb-10 text-sm font-light text-ink-600">
+        <p class="text-sm font-light text-ink-600">
           你拿到 {{ state.my_score ?? 0 }} 分<span v-if="myRank">，排名第 {{ myRank }}</span>
         </p>
-        <Podium :players="players" :me-id="meId" />
+      </div>
+
+      <TopThreeChart
+        :rows="players"
+        :me-id="meId"
+        eyebrow="FINAL PODIUM"
+        title="本場前三名"
+      />
+
+      <div class="card p-5 sm:p-6">
+        <p class="section-subtitle mb-2 text-left">FINAL RANKING</p>
+        <RankList :players="players" :me-id="meId" />
       </div>
 
       <div class="flex flex-wrap justify-center gap-3">

@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import OptionTile from '../components/OptionTile.vue'
-import Podium from '../components/Podium.vue'
+import TopThreeChart from '../components/TopThreeChart.vue'
 import RankList from '../components/RankList.vue'
 import TimerRing from '../components/TimerRing.vue'
 import { hostAction } from '../db/api'
@@ -189,8 +189,14 @@ async function copyPin() {
     <template v-else>
       <div class="card p-8 text-center sm:p-12">
         <p class="section-subtitle">FINAL RESULT</p>
-        <h2 class="section-title mb-10">遊戲結束</h2>
-        <Podium :players="players" />
+        <h2 class="section-title">遊戲結束</h2>
+      </div>
+
+      <TopThreeChart :rows="players" eyebrow="FINAL PODIUM" title="本場前三名" />
+
+      <div class="card p-5 sm:p-6">
+        <p class="section-subtitle mb-2 text-left">FINAL RANKING</p>
+        <RankList :players="players" />
       </div>
 
       <div class="flex justify-center gap-4">

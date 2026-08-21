@@ -1,9 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import IconCrown from './IconCrown.vue'
-import type { GlobalRankRow } from '../db/api'
 
-const props = defineProps<{ rows: GlobalRankRow[]; meId?: string | null }>()
+/**
+ * 前三名頒獎台。只吃 { user_id, nickname, score }，
+ * 所以總排行榜（GlobalRankRow）與單場結算（GamePlayer）都能共用。
+ */
+const props = withDefaults(
+  defineProps<{
+    rows: { user_id: string; nickname: string; score: number }[]
+    meId?: string | null
+    eyebrow?: string
+    title?: string
+  }>(),
+  { meId: null, eyebrow: 'TOP 3', title: '前三名總分' },
+)
 
 /** 長條由 0 往上長，掛載後才切換到實際高度 */
 const grown = ref(false)
@@ -16,7 +27,7 @@ onMounted(() => {
 const top = computed(() => props.rows.slice(0, 3))
 
 /** 以第一名為基準換算高度；全 0 分時避免除以零 */
-const max = computed(() => Math.max(...top.value.map((r) => r.total_score), 1))
+const max = computed(() => Math.max(...top.value.map((r) => r.score), 1))
 
 /** 頒獎台排序：第二名在左、第一名在中、第三名在右 */
 const columns = computed(() =>
@@ -24,13 +35,13 @@ const columns = computed(() =>
     .filter((i) => top.value[i])
     .map((i) => {
       const row = top.value[i]
-      const ratio = row.total_score / max.value
+      const ratio = row.score / max.value
       return {
         row,
         rank: i + 1,
         // 分數不是 0 就至少留 8px，免得極小的長條看起來像壞掉
         height: `max(calc(var(--podium-max) * ${ratio.toFixed(4)}), ${
-          row.total_score > 0 ? '8px' : '0px'
+          row.score > 0 ? '8px' : '0px'
         })`,
         // 由中間的第一名先長，再往兩側
         delay: (i === 0 ? 0 : i === 1 ? 160 : 300) + 'ms',
@@ -42,8 +53,8 @@ const columns = computed(() =>
 <template>
   <figure v-if="top.length" class="card m-0 p-5 sm:p-8">
     <figcaption class="mb-6 border-b border-blossom-200 pb-3">
-      <p class="section-subtitle text-left">TOP 3</p>
-      <h2 class="font-serif text-lg text-blossom-600">前三名總分</h2>
+      <p class="section-subtitle text-left">{{ eyebrow }}</p>
+      <h2 class="font-serif text-lg text-blossom-600">{{ title }}</h2>
     </figcaption>
 
     <div class="podium-chart">
@@ -58,7 +69,7 @@ const columns = computed(() =>
         </span>
         <span class="text-[11px] tracking-widest text-ink-400">第 {{ c.rank }} 名</span>
         <span class="font-serif text-lg tabular-nums text-ink-900 sm:text-xl">
-          {{ c.row.total_score }}
+          {{ c.row.score }}
         </span>
 
         <div
