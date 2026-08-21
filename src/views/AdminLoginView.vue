@@ -94,6 +94,7 @@ async function submitApply() {
             v-model="nickname"
             type="text"
             autocomplete="username"
+            maxlength="20"
             placeholder="帳號暱稱"
             class="field"
           />

@@ -101,6 +101,9 @@ export interface GlobalRankRow {
 // 注意：Supabase 會拒絕 .local 等無效網域，需用有效 TLD（實測 quizgame.com 可用）。
 const EMAIL_DOMAIN = 'quizgame.com'
 
+/** 暱稱長度上限，與資料庫的 profiles_nickname_valid 一致 */
+export const NICKNAME_MAX = 20
+
 function emailForNickname(nickname: string): string {
   const bytes = new TextEncoder().encode(nickname.trim().toLowerCase())
   const hex = Array.from(bytes)
@@ -125,6 +128,8 @@ async function fetchProfile(userId: string): Promise<{ nickname: string; is_admi
 export async function registerOrLogin(nickname: string, password: string): Promise<AppUser> {
   const name = nickname.trim()
   if (!name) throw new Error('暱稱不可空白')
+  // 與 profiles_nickname_valid 這條 check constraint 對齊
+  if (name.length > NICKNAME_MAX) throw new Error(`暱稱請控制在 ${NICKNAME_MAX} 個字元以內`)
   if (!password) throw new Error('密碼不可空白')
   const email = emailForNickname(name)
 
@@ -160,6 +165,9 @@ export async function registerOrLogin(nickname: string, password: string): Promi
       .from('profiles')
       .insert({ id: uid, nickname: name })
     if (profErr && !profErr.message.includes('duplicate')) {
+      if (profErr.message.includes('profiles_nickname_valid')) {
+        throw new Error(`暱稱格式不符：需為 1～${NICKNAME_MAX} 個字元，且前後不可有空白`)
+      }
       throw new Error('建立個人資料失敗：' + profErr.message)
     }
     return { id: uid, nickname: name, isAdmin: false }
@@ -389,6 +397,19 @@ export async function hostAction(
   })
   if (error) throw new Error(error.message)
   return normalizeState(firstRow(data))
+}
+
+/**
+ * 主持人把玩家移出場外，回傳被移出者的暱稱。
+ * 伺服器會同時寫入黑名單，被移出的人無法再用代碼加入同一場。
+ */
+export async function kickPlayer(gameId: string, userId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('kick_player', {
+    p_game_id: assertUuid(gameId, '移出玩家失敗'),
+    p_user_id: userId,
+  })
+  if (error) throw new Error(error.message)
+  return String(firstRow(data)?.nickname ?? '')
 }
 
 /** 我目前主持中或參加中的遊戲（重新整理後可直接回到現場） */

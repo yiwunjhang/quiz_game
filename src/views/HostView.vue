@@ -5,7 +5,7 @@ import OptionTile from '../components/OptionTile.vue'
 import TopThreeChart from '../components/TopThreeChart.vue'
 import RankList from '../components/RankList.vue'
 import TimerRing from '../components/TimerRing.vue'
-import { hostAction } from '../db/api'
+import { hostAction, kickPlayer, type GamePlayer } from '../db/api'
 import { useGame } from '../composables/useGame'
 
 const route = useRoute()
@@ -48,6 +48,22 @@ async function act(action: 'start' | 'reveal' | 'next' | 'end') {
 async function endGame() {
   if (!confirm('確定要結束這場遊戲嗎？')) return
   await act('end')
+}
+
+async function kick(p: GamePlayer) {
+  if (!confirm(`確定要把「${p.nickname}」移出這場遊戲嗎？\n對方將無法再用代碼加入，作答紀錄也會一併刪除。`)) {
+    return
+  }
+  busy.value = true
+  actionError.value = ''
+  try {
+    await kickPlayer(gameId, p.user_id)
+    await refresh()
+  } catch (e: any) {
+    actionError.value = e?.message ?? '移出玩家失敗'
+  } finally {
+    busy.value = false
+  }
 }
 
 async function copyPin() {
@@ -102,11 +118,22 @@ async function copyPin() {
           <span
             v-for="p in players"
             :key="p.user_id"
-            class="animate-fade-up rounded-full border border-blossom-300 bg-blossom-50 px-4 py-1.5 text-sm text-ink-800"
+            class="animate-fade-up flex items-center gap-1.5 rounded-full border border-blossom-300 bg-blossom-50 py-1.5 pl-4 pr-2 text-sm text-ink-800"
           >
             {{ p.nickname }}
+            <button
+              type="button"
+              class="grid h-5 w-5 place-items-center rounded-full text-xs text-ink-400 transition-colors duration-300 hover:bg-blossom-200 hover:text-blossom-600"
+              :disabled="busy"
+              :title="`移出 ${p.nickname}`"
+              @click="kick(p)"
+            >
+              ✕
+            </button>
           </span>
         </div>
+
+        <p v-if="actionError" class="mt-4 text-sm text-blossom-600">{{ actionError }}</p>
       </div>
 
       <div class="flex flex-wrap justify-center gap-4">
@@ -158,7 +185,7 @@ async function copyPin() {
 
       <div v-if="phase === 'reveal'" class="card p-7">
         <p class="section-subtitle mb-2 text-left">STANDINGS</p>
-        <RankList :players="players" :limit="5" />
+        <RankList :players="players" :limit="5" kickable @kick="kick" />
       </div>
 
       <p v-if="actionError" class="text-center text-sm text-blossom-600">{{ actionError }}</p>

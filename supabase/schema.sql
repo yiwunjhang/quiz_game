@@ -12,6 +12,23 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+-- 暱稱會直接顯示在投影畫面、頒獎台與排行榜上，但前端的 maxlength 只是
+-- HTML 屬性，繞過前端直接打 PostgREST 就能塞進任意長度把版面撐爛。
+-- 用 not valid：只約束之後的寫入，不會因為既有資料不合規而讓整份腳本失敗。
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.profiles'::regclass
+      and conname = 'profiles_nickname_valid'
+  ) then
+    alter table public.profiles
+      add constraint profiles_nickname_valid
+      check (nickname = btrim(nickname) and char_length(nickname) between 1 and 20)
+      not valid;
+  end if;
+end $$;
+
 alter table public.profiles enable row level security;
 
 drop policy if exists "profiles_select_own" on public.profiles;
@@ -122,9 +139,21 @@ create table if not exists public.game_answers (
   unique (game_id, question_id, user_id)
 );
 
+-- ---------- game_kicks：被主持人移出的玩家 ----------
+-- 只刪 game_players 不夠，被踢的人再輸入一次代碼就回來了，
+-- 所以另外記一筆黑名單，join_game 會據此擋下。
+create table if not exists public.game_kicks (
+  game_id uuid not null references public.games(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  kicked_at timestamptz not null default now(),
+  primary key (game_id, user_id)
+);
+
 alter table public.games enable row level security;
 alter table public.game_players enable row level security;
 alter table public.game_answers enable row level security;
+-- game_kicks 開了 RLS 但不給任何 policy → 只有下方的 security definer 函式碰得到
+alter table public.game_kicks enable row level security;
 
 -- 「我是不是這場遊戲的成員」。必須是 security definer，policy 才不會因為
 -- 查詢自己所保護的資料表而觸發 infinite recursion。
@@ -200,6 +229,7 @@ drop function if exists public.get_global_leaderboard();
 drop function if exists public.list_my_games();
 drop function if exists public.delete_game(uuid);
 drop function if exists public.set_game_leaderboard(uuid, boolean);
+drop function if exists public.kick_player(uuid, uuid);
 
 -- ---------- 建立遊戲（限後台主持人帳號，即 profiles.is_admin = true） ----------
 create or replace function public.create_game(p_seconds int default 20, p_count int default 10)
@@ -277,6 +307,13 @@ begin
     return v_game.id;  -- 主持人直接回到自己的控台
   end if;
 
+  if exists (
+    select 1 from public.game_kicks
+    where game_id = v_game.id and user_id = auth.uid()
+  ) then
+    raise exception '你已被主持人移出這場遊戲，無法再加入';
+  end if;
+
   -- 遊戲開始後只允許已在場內的玩家重新連線
   if v_game.status <> 'lobby'
      and not exists (
@@ -320,6 +357,12 @@ begin
   if not v_is_host and not exists (
     select 1 from public.game_players where game_id = g.id and user_id = auth.uid()
   ) then
+    -- 被踢的人給明確訊息，不要讓他以為是連線出問題
+    if exists (
+      select 1 from public.game_kicks where game_id = g.id and user_id = auth.uid()
+    ) then
+      raise exception '你已被主持人移出這場遊戲';
+    end if;
     raise exception '你不在這場遊戲裡';
   end if;
 
@@ -530,6 +573,48 @@ begin
   end if;
 
   return public.get_game_state(p_game_id);
+end;
+$$;
+
+-- ---------- 主持人把玩家移出場外 ----------
+-- 連同該玩家的作答一起刪掉，「已作答 N / M」的統計才不會把他算進去。
+create or replace function public.kick_player(p_game_id uuid, p_user_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  g public.games%rowtype;
+  v_nick text;
+begin
+  select * into g from public.games where id = p_game_id;
+  if g.id is null then
+    raise exception '遊戲不存在';
+  end if;
+  if g.host_id <> auth.uid() then
+    raise exception '只有主持人可以移出玩家';
+  end if;
+  if p_user_id = g.host_id then
+    raise exception '不能移出主持人自己';
+  end if;
+
+  select nickname into v_nick
+  from public.game_players
+  where game_id = p_game_id and user_id = p_user_id;
+
+  if v_nick is null then
+    raise exception '這位玩家不在場內';
+  end if;
+
+  insert into public.game_kicks (game_id, user_id)
+  values (p_game_id, p_user_id)
+  on conflict (game_id, user_id) do nothing;
+
+  delete from public.game_answers where game_id = p_game_id and user_id = p_user_id;
+  delete from public.game_players where game_id = p_game_id and user_id = p_user_id;
+
+  return jsonb_build_object('ok', true, 'nickname', v_nick);
 end;
 $$;
 
@@ -823,6 +908,7 @@ grant execute on function public.join_game(text) to authenticated;
 grant execute on function public.get_game_state(uuid) to authenticated;
 grant execute on function public.submit_live_answer(uuid, int) to authenticated;
 grant execute on function public.host_action(uuid, text) to authenticated;
+grant execute on function public.kick_player(uuid, uuid) to authenticated;
 grant execute on function public.get_my_active_game() to authenticated;
 grant execute on function public.list_my_games() to authenticated;
 grant execute on function public.delete_game(uuid) to authenticated;
