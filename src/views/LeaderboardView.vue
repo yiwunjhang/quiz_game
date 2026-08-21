@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import TopThreeChart from '../components/TopThreeChart.vue'
 import { getGlobalLeaderboard, type GlobalRankRow } from '../db/api'
 import { useSessionStore } from '../stores/session'
@@ -19,6 +19,10 @@ onMounted(async () => {
   }
 })
 
+/** 頒獎台只需要 user_id / nickname / score，總排行榜用累計總分 */
+const podiumRows = computed(() =>
+  rows.value.map((r) => ({ user_id: r.user_id, nickname: r.nickname, score: r.total_score })),
+)
 </script>
 
 <template>
@@ -37,7 +41,7 @@ onMounted(async () => {
       還沒有完賽的紀錄，快去開一場遊戲吧
     </div>
 
-    <TopThreeChart v-else-if="rows.length" :rows="rows" :me-id="session.currentUser?.id" />
+    <TopThreeChart v-else-if="rows.length" :rows="podiumRows" :me-id="session.currentUser?.id" />
 
     <!-- 完整名次同時也是圖表的表格版本 -->
     <ul
