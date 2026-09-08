@@ -112,13 +112,38 @@ function emailForNickname(nickname: string): string {
   return `u${hex}@${EMAIL_DOMAIN}`
 }
 
+/**
+ * 判斷這個錯誤是不是「後端連不上／暫時不能服務」，是的話回傳要顯示的訊息，
+ * 不是（也就是真的帳號密碼不對）就回傳 null。
+ *
+ * Supabase 專案被暫停時 signInWithPassword 一樣只是回傳 error，若一律當成
+ * 「帳號或密碼錯誤」，就會讓人以為帳號被刪了，實際上只是後端不在。
+ */
+function serviceErrorMessage(error: any): string | null {
+  if (!error) return null
+  const status = Number(error.status ?? 0)
+
+  // 連不到主機時 auth-js 丟 AuthRetryableFetchError，PostgREST 則是原生的 TypeError，
+  // 兩者都沒有 HTTP 狀態碼可看
+  if (!status) {
+    return '連不上伺服器。請檢查網路，並確認 Supabase 專案沒有被暫停（免費方案閒置約 7 天會自動暫停，到 Dashboard 按 Restore 即可）'
+  }
+  if (status === 429) return '嘗試次數過多，請稍等一下再試'
+  // 404 = 專案不存在或剛被暫停；5xx = 服務異常。兩者都不是使用者打錯密碼
+  if (status === 404 || status >= 500) {
+    return `伺服器目前無法服務（HTTP ${status}），請稍後再試`
+  }
+  return null
+}
+
 async function fetchProfile(userId: string): Promise<{ nickname: string; is_admin: boolean } | null> {
   const { data, error } = await supabase
     .from('profiles')
     .select('nickname, is_admin')
     .eq('id', userId)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  // 後端不在時 PostgREST 只會給「TypeError: Failed to fetch」，換成看得懂的說法
+  if (error) throw new Error(serviceErrorMessage(error) ?? error.message)
   return data
 }
 
@@ -137,6 +162,10 @@ export async function registerOrLogin(nickname: string, password: string): Promi
   const signIn = await supabase.auth.signInWithPassword({ email, password })
 
   if (signIn.error) {
+    // 後端根本連不上時就別再試註冊，否則會變成看不懂的「註冊失敗：Failed to fetch」
+    const down = serviceErrorMessage(signIn.error)
+    if (down) throw new Error(down)
+
     // 登入失敗 → 可能尚未註冊，嘗試註冊
     const signUp = await supabase.auth.signUp({
       email,
@@ -144,6 +173,8 @@ export async function registerOrLogin(nickname: string, password: string): Promi
       options: { data: { nickname: name } },
     })
     if (signUp.error) {
+      const signUpDown = serviceErrorMessage(signUp.error)
+      if (signUpDown) throw new Error(signUpDown)
       const msg = signUp.error.message ?? ''
       const code = (signUp.error as any).code ?? ''
       if (code === 'user_already_exists' || /already registered|already been registered/i.test(msg)) {
@@ -187,7 +218,7 @@ export async function adminLogin(nickname: string, password: string): Promise<Ap
   const name = nickname.trim()
   const email = emailForNickname(name)
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw new Error('帳號或密碼錯誤')
+  if (error) throw new Error(serviceErrorMessage(error) ?? '帳號或密碼錯誤')
 
   const uid = data.user.id
   const prof = await fetchProfile(uid)
