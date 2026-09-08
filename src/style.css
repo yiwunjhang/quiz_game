@@ -560,6 +560,117 @@ body {
   color: var(--color-blossom-600);
   box-shadow: var(--shadow-soft);
 }
+/* ---------- 幸運轉盤 ---------- */
+.wheel {
+  position: relative;
+  width: 100%;
+  max-width: 26rem;
+  margin: 0 auto;
+  aspect-ratio: 1;
+}
+
+.wheel-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 12px 18px rgb(201 96 96 / 0.15));
+}
+
+/* 轉動本體。用長的 ease-out 尾巴，最後一圈會慢慢收住 */
+.wheel-rotor {
+  transform-origin: 100px 100px;
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.16, 0.84, 0.22, 1);
+}
+
+/* 指針壓在輪盤上緣，尖端朝下 */
+.wheel-pointer {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  z-index: 1;
+  width: 1.4rem;
+  height: 1.9rem;
+  transform: translateX(-50%);
+  background: var(--color-blossom-500);
+  border-radius: 0.35rem 0.35rem 0 0;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  filter: drop-shadow(0 3px 4px rgb(201 96 96 / 0.35));
+}
+
+.wheel-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.875rem;
+  font-weight: 300;
+  color: var(--color-ink-400);
+}
+
+/* 中獎名字：跳出來的瞬間放大一下 */
+.wheel-winner {
+  animation: winner-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+@keyframes winner-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-winner {
+    animation: none;
+  }
+}
+
+/* 名單上的一顆顆名字 */
+.name-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-blossom-200);
+  background: var(--color-blossom-50);
+  padding: 0.3rem 0.5rem 0.3rem 0.85rem;
+  font-size: 0.8125rem;
+  color: var(--color-ink-800);
+}
+
+.name-chip button {
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  place-items: center;
+  border-radius: 9999px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-400);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.name-chip button:hover {
+  background: var(--color-blossom-200);
+  color: var(--color-blossom-600);
+}
+
+.name-chip-won {
+  border-style: dashed;
+  background: #fff;
+  color: var(--color-ink-400);
+  text-decoration: line-through;
+}
+
 } /* @layer components 結束 */
 
 /* ---------- 動畫 ---------- */

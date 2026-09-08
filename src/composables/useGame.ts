@@ -40,7 +40,14 @@ export function useGame(gameId: string) {
         state.value = next
         error.value = ''
       } catch (e: any) {
-        error.value = e?.message ?? '連線失敗'
+        const msg = e?.message ?? '連線失敗'
+        error.value = msg
+        // 被主持人移出後，若還留著上一次的 state，畫面會停在舊題目、
+        // 輪詢也繼續空轉。清掉 state 讓上層切到提示卡，並停止連線。
+        if (/移出|不在這場遊戲/.test(msg)) {
+          state.value = null
+          stop()
+        }
       } finally {
         loading.value = false
         inflight = null

@@ -101,6 +101,9 @@ export interface GlobalRankRow {
 // 注意：Supabase 會拒絕 .local 等無效網域，需用有效 TLD（實測 quizgame.com 可用）。
 const EMAIL_DOMAIN = 'quizgame.com'
 
+/** 暱稱長度上限，與資料庫的 profiles_nickname_valid 一致 */
+export const NICKNAME_MAX = 20
+
 function emailForNickname(nickname: string): string {
   const bytes = new TextEncoder().encode(nickname.trim().toLowerCase())
   const hex = Array.from(bytes)
@@ -109,13 +112,38 @@ function emailForNickname(nickname: string): string {
   return `u${hex}@${EMAIL_DOMAIN}`
 }
 
+/**
+ * 判斷這個錯誤是不是「後端連不上／暫時不能服務」，是的話回傳要顯示的訊息，
+ * 不是（也就是真的帳號密碼不對）就回傳 null。
+ *
+ * Supabase 專案被暫停時 signInWithPassword 一樣只是回傳 error，若一律當成
+ * 「帳號或密碼錯誤」，就會讓人以為帳號被刪了，實際上只是後端不在。
+ */
+function serviceErrorMessage(error: any): string | null {
+  if (!error) return null
+  const status = Number(error.status ?? 0)
+
+  // 連不到主機時 auth-js 丟 AuthRetryableFetchError，PostgREST 則是原生的 TypeError，
+  // 兩者都沒有 HTTP 狀態碼可看
+  if (!status) {
+    return '連不上伺服器。請檢查網路，並確認 Supabase 專案沒有被暫停（免費方案閒置約 7 天會自動暫停，到 Dashboard 按 Restore 即可）'
+  }
+  if (status === 429) return '嘗試次數過多，請稍等一下再試'
+  // 404 = 專案不存在或剛被暫停；5xx = 服務異常。兩者都不是使用者打錯密碼
+  if (status === 404 || status >= 500) {
+    return `伺服器目前無法服務（HTTP ${status}），請稍後再試`
+  }
+  return null
+}
+
 async function fetchProfile(userId: string): Promise<{ nickname: string; is_admin: boolean } | null> {
   const { data, error } = await supabase
     .from('profiles')
     .select('nickname, is_admin')
     .eq('id', userId)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  // 後端不在時 PostgREST 只會給「TypeError: Failed to fetch」，換成看得懂的說法
+  if (error) throw new Error(serviceErrorMessage(error) ?? error.message)
   return data
 }
 
@@ -125,6 +153,8 @@ async function fetchProfile(userId: string): Promise<{ nickname: string; is_admi
 export async function registerOrLogin(nickname: string, password: string): Promise<AppUser> {
   const name = nickname.trim()
   if (!name) throw new Error('暱稱不可空白')
+  // 與 profiles_nickname_valid 這條 check constraint 對齊
+  if (name.length > NICKNAME_MAX) throw new Error(`暱稱請控制在 ${NICKNAME_MAX} 個字元以內`)
   if (!password) throw new Error('密碼不可空白')
   const email = emailForNickname(name)
 
@@ -132,6 +162,10 @@ export async function registerOrLogin(nickname: string, password: string): Promi
   const signIn = await supabase.auth.signInWithPassword({ email, password })
 
   if (signIn.error) {
+    // 後端根本連不上時就別再試註冊，否則會變成看不懂的「註冊失敗：Failed to fetch」
+    const down = serviceErrorMessage(signIn.error)
+    if (down) throw new Error(down)
+
     // 登入失敗 → 可能尚未註冊，嘗試註冊
     const signUp = await supabase.auth.signUp({
       email,
@@ -139,6 +173,8 @@ export async function registerOrLogin(nickname: string, password: string): Promi
       options: { data: { nickname: name } },
     })
     if (signUp.error) {
+      const signUpDown = serviceErrorMessage(signUp.error)
+      if (signUpDown) throw new Error(signUpDown)
       const msg = signUp.error.message ?? ''
       const code = (signUp.error as any).code ?? ''
       if (code === 'user_already_exists' || /already registered|already been registered/i.test(msg)) {
@@ -160,6 +196,9 @@ export async function registerOrLogin(nickname: string, password: string): Promi
       .from('profiles')
       .insert({ id: uid, nickname: name })
     if (profErr && !profErr.message.includes('duplicate')) {
+      if (profErr.message.includes('profiles_nickname_valid')) {
+        throw new Error(`暱稱格式不符：需為 1～${NICKNAME_MAX} 個字元，且前後不可有空白`)
+      }
       throw new Error('建立個人資料失敗：' + profErr.message)
     }
     return { id: uid, nickname: name, isAdmin: false }
@@ -179,7 +218,7 @@ export async function adminLogin(nickname: string, password: string): Promise<Ap
   const name = nickname.trim()
   const email = emailForNickname(name)
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw new Error('帳號或密碼錯誤')
+  if (error) throw new Error(serviceErrorMessage(error) ?? '帳號或密碼錯誤')
 
   const uid = data.user.id
   const prof = await fetchProfile(uid)
@@ -391,6 +430,19 @@ export async function hostAction(
   return normalizeState(firstRow(data))
 }
 
+/**
+ * 主持人把玩家移出場外，回傳被移出者的暱稱。
+ * 伺服器會同時寫入黑名單，被移出的人無法再用代碼加入同一場。
+ */
+export async function kickPlayer(gameId: string, userId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('kick_player', {
+    p_game_id: assertUuid(gameId, '移出玩家失敗'),
+    p_user_id: userId,
+  })
+  if (error) throw new Error(error.message)
+  return String(firstRow(data)?.nickname ?? '')
+}
+
 /** 我目前主持中或參加中的遊戲（重新整理後可直接回到現場） */
 export async function getMyActiveGame(): Promise<{ gameId: string; pin: string; isHost: boolean } | null> {
   const { data, error } = await supabase.rpc('get_my_active_game')
@@ -444,6 +496,28 @@ export async function setGameLeaderboard(gameId: string, show: boolean): Promise
     p_show: show,
   })
   if (error) throw new Error(error.message)
+}
+
+/**
+ * 某場次的參加者名單（幸運轉盤抽獎用）。
+ *
+ * 直接查 game_players 就好：RLS 的 game_players_select_members 已經限定
+ * 只有該場主持人與場內玩家讀得到，不必再多開一支 RPC。
+ */
+export async function listGamePlayers(gameId: string): Promise<GamePlayer[]> {
+  const id = assertUuid(gameId, '讀取名單失敗')
+  const { data, error } = await supabase
+    .from('game_players')
+    .select('user_id, nickname, score, correct_count')
+    .eq('game_id', id)
+    .order('joined_at')
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((r: any) => ({
+    user_id: String(r.user_id),
+    nickname: String(r.nickname),
+    score: Number(r.score ?? 0),
+    correct_count: Number(r.correct_count ?? 0),
+  }))
 }
 
 /** 總排行榜：累計所有已結束場次的得分 */

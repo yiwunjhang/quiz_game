@@ -8,9 +8,13 @@ const props = withDefaults(
     meId?: string | null
     /** 只顯示前幾名（不含自己時，自己會補在最後） */
     limit?: number
+    /** 主持人畫面才開，每列多一個移出玩家的按鈕 */
+    kickable?: boolean
   }>(),
-  { limit: 0, meId: null },
+  { limit: 0, meId: null, kickable: false },
 )
+
+defineEmits<{ kick: [player: GamePlayer] }>()
 
 const ranked = computed(() => props.players.map((p, i) => ({ ...p, rank: i + 1 })))
 
@@ -46,6 +50,15 @@ const shown = computed(() => {
       <span class="flex-none font-serif text-lg tabular-nums text-blossom-600">
         {{ p.score }}
       </span>
+      <button
+        v-if="kickable"
+        type="button"
+        class="h-8 w-8 flex-none rounded-full border border-blossom-200 text-ink-400 transition-all duration-300 hover:border-blossom-500 hover:text-blossom-600"
+        :title="`移出 ${p.nickname}`"
+        @click="$emit('kick', p)"
+      >
+        ✕
+      </button>
     </li>
   </ul>
 </template>

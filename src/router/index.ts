@@ -44,6 +44,13 @@ const router = createRouter({
       meta: { requiresAdmin: true },
     },
     {
+      // 只有主持人看得到的抽獎轉盤
+      path: '/admin/wheel',
+      name: 'admin-wheel',
+      component: () => import('../views/AdminWheelView.vue'),
+      meta: { requiresAdmin: true },
+    },
+    {
       // 審核他人的主持人權限申請
       path: '/admin/applications',
       name: 'admin-applications',

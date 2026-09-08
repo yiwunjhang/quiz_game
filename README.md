@@ -15,6 +15,7 @@ Kahoot 式的**即時多人問答遊戲**：主持人在後台建立遊戲、參
 - 🏆 **頒獎台**：終場前三名頒獎台 + 完整名次；另有累計所有場次的總排行榜
 - 🛡️ **防作弊**：正確答案存在伺服器，公布前前端拿不到；分數由伺服器依時間計算
 - ⚙️ **後台管理**：新增／編輯／刪除題目、匯出／匯入題庫 JSON（需管理權限）
+- 🎡 **幸運轉盤**：只有主持人看得到，可直接把某場問答的參加者載入名單抽獎，並依序抽出設定好的獎品品項
 
 ## 遊玩流程
 
@@ -23,6 +24,7 @@ Kahoot 式的**即時多人問答遊戲**：主持人在後台建立遊戲、參
 3. 主持人按「開始遊戲」，所有人同時看到第一題並開始倒數。
 4. 時間到（或主持人提前公布）就顯示答案與戰況，主持人按「下一題」繼續。
 5. 最後一題後進入結算頒獎台。
+6. （選用）主持人到後台 **幸運轉盤**，載入這場的參加者名單抽獎品。
 
 ## 架構
 
@@ -120,6 +122,41 @@ VITE_SUPABASE_ANON_KEY=你的-anon-public-key
 
 ## 常見問題
 
+- **突然全站都連不上、主持人也登不進去** → 先確認 Supabase 專案是不是被暫停了。
+  免費方案閒置約 7 天會自動 pause，此時連 API 網域都會解析不到：
+
+  ```sh
+  # 回 NXDOMAIN 就是專案被暫停或已刪除
+  nslookup <你的專案ref>.supabase.co
+  # 或直接開這個網址，正常會回一段 GoTrue 的 JSON
+  # https://<你的專案ref>.supabase.co/auth/v1/health
+  ```
+
+  到 Supabase Dashboard 按 **Restore** 即可，ref 與網址都不變、**資料完全不會遺失**，
+  程式碼與 repo Variables 都不用改。恢復要幾分鐘，而且本機 DNS 會快取一段時間的
+  「查無此站」，所以按完不會立刻通，等一下再試。恢復後所有人的登入狀態會失效，
+  重新登入一次即可。活動前一天記得先戳一下網站把專案叫醒。
+- **主持人帳號好像不見了、登入被擋** → 多半是上一點造成的假象：後端連不上時登入一定
+  失敗，看起來就像帳號被刪了（現在會顯示「連不上伺服器…」，不再跟打錯密碼混在一起）。
+  真的要確認帳號還在不在，到 SQL Editor 跑：
+
+  ```sql
+  select u.email, u.created_at, p.nickname, p.is_admin
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+  order by u.created_at;
+  ```
+
+  `is_admin` 是 false 就用「三、設定第一位主持人」那句 update 開回來；`nickname`／
+  `is_admin` 整欄是 null 代表 profiles 那列不見，補一列即可：
+
+  ```sql
+  insert into public.profiles (id, nickname, is_admin)
+  values ('該使用者的 id', '你的暱稱', true)
+  on conflict (id) do update set is_admin = true;
+  ```
+
+  改完要先登出再重新登入，舊的 session 不會自動變成管理者。
 - **註冊時出現「未取得登入狀態」** → 請確認步驟一第 4 點已關閉 Email 驗證。
 - **首頁顯示「尚未設定 Supabase 連線資訊」** → `.env.local`（本機）或 repo Variables（部署）未設定。
 - **密碼太短被拒** → Supabase 預設密碼至少 6 碼。
