@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import AdminNav from '../components/AdminNav.vue'
 import LuckyWheel from '../components/LuckyWheel.vue'
 import { listGamePlayers, listMyGames, type HostedGame } from '../db/api'
 
@@ -260,7 +259,13 @@ function formatTime(iso: string) {
 
 <template>
   <div class="space-y-8">
-    <AdminNav title="幸運轉盤" />
+    <div class="flex flex-wrap items-end justify-between gap-4 border-b border-blossom-200 pb-4">
+      <div>
+        <p class="section-subtitle text-left">LUCKY DRAW</p>
+        <h1 class="font-serif text-2xl text-blossom-600">幸運轉盤</h1>
+      </div>
+      <RouterLink :to="{ name: 'admin-games' }" class="btn btn-ghost btn-sm">回後台</RouterLink>
+    </div>
 
     <p v-if="error" class="text-sm text-blossom-600">{{ error }}</p>
     <p v-if="message" class="text-sm text-sage-600">{{ message }}</p>
@@ -269,8 +274,8 @@ function formatTime(iso: string) {
       <!-- 轉盤 -->
       <div class="card space-y-5 p-5 sm:p-7">
         <div class="text-center">
-          <p class="section-subtitle">{{ prizeLabel ? 'NOW DRAWING' : 'LUCKY DRAW' }}</p>
-          <h2 class="font-serif text-xl text-blossom-600">{{ prizeLabel || '幸運轉盤' }}</h2>
+          <p class="section-subtitle">{{ prizeLabel ? 'NOW DRAWING' : 'READY' }}</p>
+          <h2 class="font-serif text-xl text-blossom-600">{{ prizeLabel || '準備開抽' }}</h2>
           <p class="mt-1 text-xs font-light text-ink-400">
             名單共 {{ entries.length }} 人<span v-if="history.length">
               · 已抽出 {{ history.length }} 位</span
