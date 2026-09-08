@@ -564,7 +564,7 @@ body {
 .wheel {
   position: relative;
   width: 100%;
-  max-width: 26rem;
+  max-width: 30rem;
   margin: 0 auto;
   aspect-ratio: 1;
 }

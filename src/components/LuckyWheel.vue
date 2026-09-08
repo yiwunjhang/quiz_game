@@ -26,13 +26,36 @@ const PALETTE = ['#ffd7d2', '#fae3c6', '#dfeadd', '#dbe7f0', '#ecdff2', '#fbe0ea
 const count = computed(() => props.names.length)
 const segAngle = computed(() => (count.value ? 360 / count.value : 360))
 
-/** 扇形太細就放棄標字，只留顏色，改由右側名單對照 */
-const showLabels = computed(() => count.value > 0 && count.value <= 48)
+/** 名字的外端貼著外圈，往圓心方向排 */
+const LABEL_OUTER = R - 8
 
-const fontSize = computed(() => Math.min(8, Math.max(3, segAngle.value * 0.42)))
+/**
+ * 字級由扇形「靠近外圈處的弧寬」決定。名字是沿半徑排的，所以限制字高的是
+ * 扇形的角寬而不是半徑長度 —— 80 人時每格 4.5°，在半徑 80 處仍有約 6.3 個
+ * 單位的弧寬，塞得下字，不需要整個放棄標示。
+ */
+const fontSize = computed(() => {
+  const arc = (2 * Math.PI * (LABEL_OUTER - 8) * segAngle.value) / 360
+  return Math.min(7, Math.max(2.2, arc * 0.72))
+})
 
-/** 名字沿著半徑排，可用長度大約是 76 個單位 */
-const maxChars = computed(() => Math.max(2, Math.floor(76 / fontSize.value)))
+/**
+ * 扇形越靠圓心越窄，字排過頭就會跟隔壁擠在一起，
+ * 所以可用長度只算到「弧寬還容得下一個字」的那個半徑為止。
+ */
+const maxChars = computed(() => {
+  const rMin = Math.min(
+    LABEL_OUTER - 8,
+    (fontSize.value * 360) / (2 * Math.PI * segAngle.value),
+  )
+  return Math.max(2, Math.floor((LABEL_OUTER - rMin) / fontSize.value))
+})
+
+/** 字小到看不出來才放棄標字，只留顏色，改由右側名單對照 */
+const showLabels = computed(() => count.value > 0 && fontSize.value >= 2.4)
+
+/** 格子多的時候白色分隔線會吃掉可見寬度，收細一點 */
+const strokeWidth = computed(() => (count.value > 40 ? 0.25 : 0.6))
 
 function pointOn(angleDeg: number, r: number) {
   const a = ((angleDeg - 90) * Math.PI) / 180
@@ -67,7 +90,7 @@ const segments = computed(() =>
     const flip = mid > 180
     const label = {
       transform: `rotate(${flip ? mid + 90 : mid - 90} ${CENTER} ${CENTER})`,
-      x: flip ? CENTER - (R - 8) : CENTER + (R - 8),
+      x: flip ? CENTER - LABEL_OUTER : CENTER + LABEL_OUTER,
       anchor: flip ? 'start' : 'end',
       text: clip(name),
     }
@@ -124,7 +147,7 @@ defineExpose({ spin, spinning })
       >
         <template v-if="count">
           <g v-for="s in segments" :key="s.key">
-            <path :d="s.d" :fill="s.fill" stroke="#fff" stroke-width="0.6" />
+            <path :d="s.d" :fill="s.fill" stroke="#fff" :stroke-width="strokeWidth" />
             <text
               v-if="showLabels"
               :transform="s.label.transform"
