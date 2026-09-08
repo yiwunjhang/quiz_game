@@ -57,6 +57,9 @@ function load() {
     history.value = Array.isArray(s.history) ? s.history : []
     removeAfterWin.value = s.removeAfterWin !== false
     selectedGameId.value = String(s.selectedGameId ?? '')
+    // 這一位一定要跟著還原，否則重新整理後他會回到池子裡被重複抽中
+    const pending = s.pendingRemove == null ? null : String(s.pendingRemove)
+    pendingRemove.value = pending && entries.value.includes(pending) ? pending : null
   } catch {
     // 壞掉的暫存不值得處理，當作沒有就好
   }
@@ -71,6 +74,7 @@ function save() {
         prizes: prizes.value,
         history: history.value,
         removeAfterWin: removeAfterWin.value,
+        pendingRemove: pendingRemove.value,
         selectedGameId: selectedGameId.value,
       }),
     )
@@ -79,7 +83,14 @@ function save() {
   }
 }
 
-watch([entries, prizes, history, removeAfterWin, selectedGameId], save, { deep: true })
+watch([entries, prizes, history, removeAfterWin, selectedGameId, pendingRemove], save, {
+  deep: true,
+})
+
+// 中途關掉「抽中後移除」，就讓還沒移出的那位留在名單裡，別在下次開轉時被偷偷拿掉
+watch(removeAfterWin, (on) => {
+  if (!on) pendingRemove.value = null
+})
 
 onMounted(async () => {
   load()
