@@ -8,7 +8,9 @@ import { computed, ref } from 'vue'
  * 這樣「抽誰」與「怎麼轉」分開，動畫再怎麼調都不會影響抽選的公平性。
  */
 const props = defineProps<{ names: string[] }>()
-const emit = defineEmits<{ (e: 'finish', index: number): void }>()
+// 回報名字而不只是索引：這是轉盤實際畫出來、指針真正停住的那一格，
+// 父層就不必再用索引去猜自己的名單，兩邊也不會因為順序不同而對不上
+const emit = defineEmits<{ (e: 'finish', name: string, index: number): void }>()
 
 /** 累加的角度，只會愈轉愈大，才不會出現倒轉 */
 const rotation = ref(0)
@@ -98,7 +100,7 @@ function onTransitionEnd(e: TransitionEvent) {
   if (e.propertyName !== 'transform') return
   const index = pendingIndex.value
   pendingIndex.value = null
-  if (index !== null) emit('finish', index)
+  if (index !== null) emit('finish', props.names[index] ?? '', index)
 }
 
 defineExpose({ spin, spinning })

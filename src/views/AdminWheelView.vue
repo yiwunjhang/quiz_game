@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import LuckyWheel from '../components/LuckyWheel.vue'
 import { listGamePlayers, listMyGames, type HostedGame } from '../db/api'
 
@@ -213,13 +213,17 @@ function pickIndex(n: number): number {
   return v % n
 }
 
-function spin() {
+async function spin() {
   if (!canSpin.value) return
   // 上一位中獎者到這時才真的離開名單，轉盤才不會在公布的瞬間跳掉
   if (pendingRemove.value) {
     const gone = pendingRemove.value
     entries.value = entries.value.filter((n) => n !== gone)
     pendingRemove.value = null
+    // 一定要等轉盤依新名單重畫完再轉。props 是下一次 render 才更新的，
+    // 少了這一步它會用「還有那個人」的扇形角度算落點，
+    // 指針停的位置就會跟公布的名字差一格。
+    await nextTick()
   }
   if (!entries.value.length) return
 
@@ -232,10 +236,10 @@ function spin() {
   }
 }
 
-function onFinish(index: number) {
+/** name 是轉盤回報的、指針實際停住的那一格 */
+function onFinish(name: string) {
   spinning.value = false
-  const name = entries.value[index]
-  if (!name) return
+  if (!name || !entries.value.includes(name)) return
 
   const prize = currentPrize.value
   const record: WinRecord = {
