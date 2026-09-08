@@ -94,11 +94,39 @@ const segments = computed(() =>
       anchor: flip ? 'start' : 'end',
       text: clip(name),
     }
-    return { key: `${i}-${name}`, d, fill, label }
+    return { i, key: `${i}-${name}`, d, fill, label, name }
   }),
 )
 
 const spinning = computed(() => pendingIndex.value !== null)
+
+/* -------- 滑鼠移到扇形上直接看名字 -------- */
+// 名單一多字就很小（80 人時約 10px），滑過去放大顯示才看得清楚是誰
+const hovered = ref<number | null>(null)
+const tipEl = ref<HTMLElement | null>(null)
+
+const hoveredName = computed(() =>
+  hovered.value === null ? '' : (props.names[hovered.value] ?? ''),
+)
+
+// 轉動中不顯示，跟著飛的提示只會干擾
+function onSegmentEnter(i: number) {
+  if (!spinning.value) hovered.value = i
+}
+
+// 直接寫 DOM 樣式，不走響應式。否則滑鼠每動一次就會讓整個轉盤
+// （80 人時就是 80 個扇形）重新 diff 一輪。
+function onMove(e: MouseEvent) {
+  const el = tipEl.value
+  if (!el) return
+  const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  el.style.left = `${e.clientX - box.left}px`
+  el.style.top = `${e.clientY - box.top}px`
+}
+
+function clearHover() {
+  hovered.value = null
+}
 
 /** 把第 index 格轉到指針下方。轉動中或名單是空的就不受理 */
 function spin(index: number) {
@@ -113,6 +141,7 @@ function spin(index: number) {
   let next = target
   while (next < rotation.value + turns * 360) next += 360
 
+  hovered.value = null
   pendingIndex.value = index
   durationMs.value = reduceMotion ? 600 : 5200
   rotation.value = next
@@ -130,7 +159,7 @@ defineExpose({ spin, spinning })
 </script>
 
 <template>
-  <div class="wheel">
+  <div class="wheel" @mousemove="onMove" @mouseleave="clearHover">
     <!-- 指針：固定在正上方，指著停下來的那一格 -->
     <div class="wheel-pointer" aria-hidden="true"></div>
 
@@ -147,7 +176,13 @@ defineExpose({ spin, spinning })
       >
         <template v-if="count">
           <g v-for="s in segments" :key="s.key">
-            <path :d="s.d" :fill="s.fill" stroke="#fff" :stroke-width="strokeWidth" />
+            <path
+              :d="s.d"
+              :fill="s.fill"
+              :stroke="hovered === s.i ? '#c96060' : '#fff'"
+              :stroke-width="hovered === s.i ? 1 : strokeWidth"
+              @mouseenter="onSegmentEnter(s.i)"
+            />
             <text
               v-if="showLabels"
               :transform="s.label.transform"
@@ -169,6 +204,9 @@ defineExpose({ spin, spinning })
       <circle :cx="CENTER" :cy="CENTER" r="13" fill="#fff" stroke="#ed9191" stroke-width="2" />
       <circle :cx="CENTER" :cy="CENTER" r="4.5" fill="#ed9191" />
     </svg>
+
+    <!-- 跟著游標的名字提示。pointer-events: none，才不會把 hover 搶走 -->
+    <div v-show="hoveredName" ref="tipEl" class="wheel-tip">{{ hoveredName }}</div>
 
     <p v-if="!count" class="wheel-empty">名單是空的</p>
   </div>
