@@ -33,6 +33,14 @@ async function logout() {
           >
             排行榜
           </RouterLink>
+          <!-- 抽獎轉盤只有主持人用得到，一般參加者不必看到這個入口 -->
+          <RouterLink
+            v-if="session.isAdmin"
+            to="/wheel"
+            class="nav-link tracking-widest text-ink-600 transition-colors duration-300 hover:text-blossom-600"
+          >
+            幸運轉盤
+          </RouterLink>
           <RouterLink
             to="/admin"
             class="nav-link tracking-widest text-ink-600 transition-colors duration-300 hover:text-blossom-600"

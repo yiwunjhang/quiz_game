@@ -44,12 +44,14 @@ const router = createRouter({
       meta: { requiresAdmin: true },
     },
     {
-      // 只有主持人看得到的抽獎轉盤
-      path: '/admin/wheel',
-      name: 'admin-wheel',
+      // 抽獎轉盤：入口在全站 navbar，但一樣只有主持人進得來
+      path: '/wheel',
+      name: 'wheel',
       component: () => import('../views/AdminWheelView.vue'),
       meta: { requiresAdmin: true },
     },
+    // 舊網址（曾經掛在後台底下）仍然可用
+    { path: '/admin/wheel', redirect: { name: 'wheel' } },
     {
       // 審核他人的主持人權限申請
       path: '/admin/applications',

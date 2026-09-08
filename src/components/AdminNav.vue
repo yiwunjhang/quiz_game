@@ -51,13 +51,6 @@ async function logout() {
           題庫管理
         </RouterLink>
         <RouterLink
-          :to="{ name: 'admin-wheel' }"
-          class="nav-link tracking-widest text-ink-600 transition-colors duration-300 hover:text-blossom-600"
-          active-class="is-active text-blossom-600"
-        >
-          幸運轉盤
-        </RouterLink>
-        <RouterLink
           :to="{ name: 'admin-applications' }"
           class="nav-link flex items-center gap-1.5 tracking-widest text-ink-600 transition-colors duration-300 hover:text-blossom-600"
           active-class="is-active text-blossom-600"
