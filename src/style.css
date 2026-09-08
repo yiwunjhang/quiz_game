@@ -598,6 +598,28 @@ body {
   filter: drop-shadow(0 3px 4px rgb(201 96 96 / 0.35));
 }
 
+/* 名字本身不吃滑鼠事件，否則游標移到字上面時，下方扇形的 hover 會斷掉 */
+.wheel-svg text {
+  pointer-events: none;
+}
+
+/* 滑過扇形時跟著游標的名字提示 */
+.wheel-tip {
+  position: absolute;
+  z-index: 2;
+  /* 浮在游標正上方，並且不吃滑鼠事件，否則會把 hover 從扇形上搶走 */
+  transform: translate(-50%, calc(-100% - 14px));
+  pointer-events: none;
+  white-space: nowrap;
+  border-radius: 9999px;
+  border: 1px solid var(--color-blossom-300);
+  background: #fff;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.875rem;
+  color: var(--color-ink-900);
+  box-shadow: var(--shadow-lift);
+}
+
 .wheel-empty {
   position: absolute;
   inset: 0;
