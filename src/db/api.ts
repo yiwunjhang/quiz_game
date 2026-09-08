@@ -467,6 +467,28 @@ export async function setGameLeaderboard(gameId: string, show: boolean): Promise
   if (error) throw new Error(error.message)
 }
 
+/**
+ * 某場次的參加者名單（幸運轉盤抽獎用）。
+ *
+ * 直接查 game_players 就好：RLS 的 game_players_select_members 已經限定
+ * 只有該場主持人與場內玩家讀得到，不必再多開一支 RPC。
+ */
+export async function listGamePlayers(gameId: string): Promise<GamePlayer[]> {
+  const id = assertUuid(gameId, '讀取名單失敗')
+  const { data, error } = await supabase
+    .from('game_players')
+    .select('user_id, nickname, score, correct_count')
+    .eq('game_id', id)
+    .order('joined_at')
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((r: any) => ({
+    user_id: String(r.user_id),
+    nickname: String(r.nickname),
+    score: Number(r.score ?? 0),
+    correct_count: Number(r.correct_count ?? 0),
+  }))
+}
+
 /** 總排行榜：累計所有已結束場次的得分 */
 export async function getGlobalLeaderboard(): Promise<GlobalRankRow[]> {
   const { data, error } = await supabase.rpc('get_global_leaderboard')
