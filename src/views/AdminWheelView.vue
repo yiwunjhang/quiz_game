@@ -35,8 +35,6 @@ const pendingRemove = ref<string | null>(null)
 
 const spinning = ref(false)
 const loading = ref(false)
-const error = ref('')
-const message = ref('')
 
 /* ---------------- 狀態保存：整理名單很花時間，重新整理不該白做 --------------- */
 
@@ -100,8 +98,8 @@ onMounted(async () => {
     if (selectedGameId.value && !games.value.some((g) => g.id === selectedGameId.value)) {
       selectedGameId.value = ''
     }
-  } catch (e: any) {
-    error.value = e?.message ?? '載入場次失敗'
+  } catch {
+    // 載不到場次仍可手動輸入名單
   }
 })
 
@@ -135,15 +133,12 @@ function addNames(names: string[]): number {
 /** 從某場問答把參加者名單抓進來 */
 async function loadFromGame() {
   if (!selectedGameId.value || spinning.value) return
-  error.value = ''
-  message.value = ''
   loading.value = true
   try {
     const players = await listGamePlayers(selectedGameId.value)
-    const added = addNames(players.map((p) => p.nickname))
-    message.value = added ? `已加入 ${added} 位參加者` : '這場的參加者都已經在名單裡了'
-  } catch (e: any) {
-    error.value = e?.message ?? '載入名單失敗'
+    addNames(players.map((p) => p.nickname))
+  } catch {
+    // 載入失敗就維持原本的名單
   } finally {
     loading.value = false
   }
@@ -152,14 +147,7 @@ async function loadFromGame() {
 /** 手動補人：換行、逗號、頓號都當成分隔 */
 function addManual() {
   if (spinning.value) return
-  const added = addNames(manualInput.value.split(/[\n,、，]/))
-  if (added) {
-    message.value = `已加入 ${added} 位`
-    error.value = ''
-    manualInput.value = ''
-  } else {
-    error.value = '沒有可以加入的新名字'
-  }
+  if (addNames(manualInput.value.split(/[\n,、，]/))) manualInput.value = ''
 }
 
 function removeName(name: string) {
@@ -227,8 +215,6 @@ async function spin() {
   }
   if (!entries.value.length) return
 
-  error.value = ''
-  message.value = ''
   winner.value = null
   spinning.value = true
   if (!wheel.value?.spin(pickIndex(entries.value.length))) {
@@ -264,7 +250,6 @@ function resetDraw() {
   prizes.value.forEach((p) => (p.drawn = 0))
   pendingRemove.value = null
   winner.value = null
-  message.value = '已重置，可以重新開抽'
 }
 
 function formatTime(iso: string) {
@@ -281,10 +266,6 @@ function formatTime(iso: string) {
       </div>
       <RouterLink :to="{ name: 'admin-games' }" class="btn btn-ghost btn-sm">回後台</RouterLink>
     </div>
-
-    <p v-if="error" class="text-sm text-blossom-600">{{ error }}</p>
-    <p v-if="message" class="text-sm text-sage-600">{{ message }}</p>
-
     <div class="grid gap-6 lg:grid-cols-[1.05fr_1fr]">
       <!-- 轉盤 -->
       <div class="card space-y-5 p-5 sm:p-7">
