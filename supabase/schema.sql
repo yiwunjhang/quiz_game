@@ -916,6 +916,37 @@ grant execute on function public.set_game_leaderboard(uuid, boolean) to authenti
 grant execute on function public.get_global_leaderboard() to anon, authenticated;
 
 -- =====================================================================
+-- 防止免費方案閒置暫停：.github/workflows/keep-supabase-alive.yml 每天呼叫 3 次。
+-- 只讀的 RPC（get_global_leaderboard）每 3 天打一次，專案仍然每週被暫停，
+-- 所以改成「真的寫入一筆資料」。表固定只有一列，不會越長越大。
+-- =====================================================================
+create table if not exists public.keep_alive (
+  id int primary key default 1 check (id = 1),
+  pinged_at timestamptz not null default now(),
+  ping_count bigint not null default 0
+);
+
+-- 開 RLS 且不給任何 policy：前端讀寫不到，只能透過下面的函式更新
+alter table public.keep_alive enable row level security;
+
+create or replace function public.keep_alive_ping()
+returns timestamptz
+language sql
+security definer
+set search_path = public
+as $$
+  insert into public.keep_alive (id, pinged_at, ping_count)
+  values (1, now(), 1)
+  on conflict (id) do update
+    set pinged_at = excluded.pinged_at,
+        ping_count = public.keep_alive.ping_count + 1
+  returning pinged_at;
+$$;
+
+revoke execute on function public.keep_alive_ping() from public;
+grant execute on function public.keep_alive_ping() to anon;
+
+-- =====================================================================
 -- 範例題目（以 SQL Editor 執行時具管理權限，會略過 RLS）
 -- =====================================================================
 insert into public.questions (text, options, correct_index)

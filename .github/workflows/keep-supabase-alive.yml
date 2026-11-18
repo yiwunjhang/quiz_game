@@ -1,11 +1,15 @@
 name: Keep Supabase Alive
 
-# Supabase 免費方案閒置約 7 天會自動暫停專案。
-# 每 3 天打一次真正會查資料庫的 RPC，讓專案保持活躍。
+# Supabase 免費方案閒置 7 天會自動暫停專案。
+# 舊版每 3 天呼叫只讀的 get_global_leaderboard，每次都回 2xx，
+# 專案卻仍在 2026-11-07 ~ 11-10 之間被暫停，可見只讀查詢不一定被算成活動。
+# Supabase 文件的說法是「過去一週每天有幾次使用者對資料庫的請求」才夠，
+# 所以現在改成一天 3 次呼叫 keep_alive_ping()，真的寫入資料庫，並確認寫入的時間是剛剛。
 on:
   schedule:
-    # UTC 01:17 = 台灣 09:17；避開整點，GitHub 整點排程常延遲或被略過
-    - cron: '17 1 */3 * *'
+    # UTC 01:17 / 09:17 / 17:17 = 台灣 09:17 / 17:17 / 01:17；
+    # 避開整點，GitHub 整點排程常延遲或被略過
+    - cron: '17 1,9,17 * * *'
   workflow_dispatch:
 
 permissions:
@@ -16,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: 呼叫 get_global_leaderboard（anon 可執行，會實際查詢 Postgres）
+      - name: 呼叫 keep_alive_ping（寫入 keep_alive 表）
         env:
           # 與 deploy.yml 共用 repo 的 Actions Variables
           SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
@@ -30,15 +34,25 @@ jobs:
           # 專案若已被暫停，網域會解析不到，curl 失敗 → workflow 失敗 → GitHub 寄信通知
           status=$(curl -sS -o response.json -w '%{http_code}' \
             --retry 3 --retry-delay 10 --retry-all-errors \
-            -X POST "$SUPABASE_URL/rest/v1/rpc/get_global_leaderboard" \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/keep_alive_ping" \
             -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
             -H "Content-Type: application/json" \
             -d '{}')
 
           echo "HTTP $status"
+          cat response.json; echo
           if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
-            echo "::error::Supabase 回應異常"
-            cat response.json
+            echo "::error::Supabase 回應異常（若是 404，代表 schema.sql 裡的 keep_alive_ping 還沒建立）"
             exit 1
           fi
-          echo "Supabase 正常運作"
+
+          # 回傳值是資料庫寫入的時間，必須是 5 分鐘內，才算真的寫進去
+          pinged_at=$(tr -d '"' < response.json)
+          age=$(( $(date -u +%s) - $(date -u -d "$pinged_at" +%s) ))
+          echo "寫入時間 $pinged_at（$age 秒前）"
+          if [ "$age" -gt 300 ] || [ "$age" -lt -300 ]; then
+            echo "::error::回傳的寫入時間不是剛剛，資料庫可能沒有真的寫入"
+            exit 1
+          fi
+          echo "Supabase 正常運作，已寫入"
